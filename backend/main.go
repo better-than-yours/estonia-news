@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -13,6 +15,15 @@ import (
 	"github.com/lafin/estonia-news/proc"
 	"github.com/lafin/estonia-news/rest"
 )
+
+// MessageConfig - config
+type MessageConfig struct {
+	FeedTitle   string
+	Title       string
+	Description string
+	Link        string
+	ImageURL    string
+}
 
 func getFeed(url string) *gofeed.Feed {
 	response, err := rest.Get(url)
@@ -27,22 +38,47 @@ func getFeed(url string) *gofeed.Feed {
 	return feed
 }
 
-func getMessage(item *gofeed.Item, feed *gofeed.Feed) *tgbotapi.MessageConfig {
+func getImageURL(item *gofeed.Item) string {
+	var url string = ""
 	if len(item.Enclosures) > 0 && item.Enclosures[0].URL != "" {
-		item.Image = &gofeed.Image{
-			URL: item.Enclosures[0].URL,
-		}
+		url = item.Enclosures[0].URL
 	} else if len(item.Extensions["media"]["thumbnail"]) > 0 && item.Extensions["media"]["thumbnail"][0].Attrs["url"] != "" {
-		item.Image = &gofeed.Image{
-			URL: item.Extensions["media"]["thumbnail"][0].Attrs["url"],
-		}
+		url = item.Extensions["media"]["thumbnail"][0].Attrs["url"]
 	}
-	msg := tgbotapi.NewMessageToChannel("@ee_news", fmt.Sprintf("<b>%s</b>\n\n%s<a href=\"%s\">&#160;</a>\n\n<a href=\"%s\">%s</a>", item.Title, item.Description, item.Image.URL, item.Link, feed.Title))
-	msg.ParseMode = tgbotapi.ModeHTML
-	return &msg
+	return url
 }
 
-func sendMessage(db *proc.Processor, item *gofeed.Item, bot *tgbotapi.BotAPI, msg *tgbotapi.MessageConfig) error {
+func getText(msg *MessageConfig) string {
+	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=\"%s\">%s</a>", msg.Title, msg.Description, msg.Link, msg.FeedTitle)
+}
+
+func getImage(imageURL string) ([]byte, error) {
+	response, err := http.Get(imageURL) // #nosec G107
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	return ioutil.ReadAll(response.Body)
+}
+
+func getMessage(channel string, msg *MessageConfig) (*tgbotapi.PhotoConfig, error) {
+	content, err := getImage(msg.ImageURL)
+	if err != nil {
+		return nil, err
+	}
+	file := tgbotapi.FileBytes{Name: msg.ImageURL, Bytes: content}
+	return &tgbotapi.PhotoConfig{
+		BaseFile: tgbotapi.BaseFile{
+			BaseChat:    tgbotapi.BaseChat{ChannelUsername: channel},
+			File:        file,
+			UseExisting: false,
+		},
+		Caption:   getText(msg),
+		ParseMode: tgbotapi.ModeHTML,
+	}, nil
+}
+
+func sendMessage(db *proc.Processor, item *gofeed.Item, bot *tgbotapi.BotAPI, msg *tgbotapi.PhotoConfig) error {
 	found := false
 	entries, err := db.LoadEntry()
 	if err != nil {
@@ -66,6 +102,7 @@ func sendMessage(db *proc.Processor, item *gofeed.Item, bot *tgbotapi.BotAPI, ms
 }
 
 func main() {
+	channelUsername := "@ee_news"
 	providers := []struct {
 		URL string
 	}{
@@ -95,13 +132,22 @@ func main() {
 			for _, provider := range providers {
 				feed := getFeed(provider.URL)
 				for _, item := range feed.Items {
-					msg := getMessage(item, feed)
 					pubDate, err := time.Parse(time.RFC1123Z, item.Published)
 					if err != nil {
 						log.Panic(err)
 					}
 					if pubDate.Add(10 * time.Hour).Before(time.Now()) {
 						continue
+					}
+					msg, err := getMessage(channelUsername, &MessageConfig{
+						FeedTitle:   feed.Title,
+						Title:       item.Title,
+						Description: item.Description,
+						Link:        item.Link,
+						ImageURL:    getImageURL(item),
+					})
+					if err != nil {
+						log.Panic(err)
 					}
 					if err := sendMessage(db, item, bot, msg); err != nil {
 						log.Panic(err)
