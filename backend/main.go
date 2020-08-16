@@ -85,15 +85,20 @@ func sendMessage(db *proc.Processor, item *gofeed.Item, bot *tgbotapi.BotAPI, ms
 		return err
 	}
 	for _, entry := range *entries {
-		if entry.Link == item.Link {
+		if entry.GUID == item.GUID {
 			found = true
 		}
 	}
 	if !found {
-		if _, err := bot.Send(msg); err != nil {
+		sendedMsg, err := bot.Send(msg)
+		if err != nil {
 			return err
 		}
-		if _, err := db.SaveEntry(model.Entry{Link: item.Link, Title: item.Title}); err != nil {
+		pubDate, err := time.Parse(time.RFC1123Z, item.Published)
+		if err != nil {
+			log.Panic(err)
+		}
+		if _, err := db.SaveEntry(model.Entry{GUID: item.GUID, Link: item.Link, Title: item.Title, Published: pubDate, MessageID: sendedMsg.MessageID}); err != nil {
 			return err
 		}
 		time.Sleep(5 * time.Second)

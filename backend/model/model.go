@@ -9,9 +9,12 @@ import (
 
 // Entry is a entry structure
 type Entry struct {
-	Link  string `xml:"link"`
-	Title string `xml:"title"`
-	Date  string `xml:"date"`
+	GUID      string    `xml:"guid"`
+	Link      string    `xml:"link"`
+	Title     string    `xml:"title"`
+	Published time.Time `xml:"published"`
+	Date      string    `xml:"date"`
+	MessageID int       `xml:"message_id"`
 }
 
 // GetKey is a method to get a bolt key
