@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
@@ -17,7 +18,10 @@ import (
 )
 
 // ChatID - Telegram chat ID
-var ChatID int64 = -1001369010280
+var ChatID = os.Getenv("TELEGRAM_CHAT_ID")
+
+// Token - Telegram token
+var Token = os.Getenv("TELEGRAM_TOKEN")
 
 // TimeoutBetweenLoops - Main loop timeout
 var TimeoutBetweenLoops = 5 * time.Minute
@@ -71,6 +75,10 @@ func getImage(imageURL string) ([]byte, error) {
 }
 
 func createNewMessageObject(msg *MessageConfig) (*tgbotapi.PhotoConfig, error) {
+	chatID, err := strconv.ParseInt(ChatID, 10, 64)
+	if err != nil {
+		return nil, err
+	}
 	content, err := getImage(msg.ImageURL)
 	if err != nil {
 		return nil, err
@@ -78,7 +86,7 @@ func createNewMessageObject(msg *MessageConfig) (*tgbotapi.PhotoConfig, error) {
 	file := tgbotapi.FileBytes{Name: msg.ImageURL, Bytes: content}
 	return &tgbotapi.PhotoConfig{
 		BaseFile: tgbotapi.BaseFile{
-			BaseChat:    tgbotapi.BaseChat{ChatID: ChatID},
+			BaseChat:    tgbotapi.BaseChat{ChatID: chatID},
 			File:        file,
 			UseExisting: false,
 		},
@@ -87,15 +95,19 @@ func createNewMessageObject(msg *MessageConfig) (*tgbotapi.PhotoConfig, error) {
 	}, nil
 }
 
-func createEditMessageObject(messageID int, msg *MessageConfig) *tgbotapi.EditMessageCaptionConfig {
+func createEditMessageObject(messageID int, msg *MessageConfig) (*tgbotapi.EditMessageCaptionConfig, error) {
+	chatID, err := strconv.ParseInt(ChatID, 10, 64)
+	if err != nil {
+		return nil, err
+	}
 	return &tgbotapi.EditMessageCaptionConfig{
 		BaseEdit: tgbotapi.BaseEdit{
-			ChatID:    ChatID,
+			ChatID:    chatID,
 			MessageID: messageID,
 		},
 		Caption:   getText(msg),
 		ParseMode: tgbotapi.ModeHTML,
-	}
+	}, nil
 }
 
 func send(bot *tgbotapi.BotAPI, db *proc.Processor, feed *gofeed.Feed, item *gofeed.Item) error {
@@ -153,15 +165,17 @@ func addMessage(bot *tgbotapi.BotAPI, db *proc.Processor, feed *gofeed.Feed, ite
 }
 
 func editMessage(bot *tgbotapi.BotAPI, db *proc.Processor, feed *gofeed.Feed, item *gofeed.Item, entry model.Entry) error {
-	msg := createEditMessageObject(entry.MessageID, &MessageConfig{
+	msg, err := createEditMessageObject(entry.MessageID, &MessageConfig{
 		FeedTitle:   feed.Title,
 		Title:       item.Title,
 		Description: item.Description,
 		Link:        item.Link,
 		ImageURL:    getImageURL(item),
 	})
-	_, err := bot.Send(msg)
 	if err != nil {
+		return err
+	}
+	if _, err = bot.Send(msg); err != nil {
 		return err
 	}
 	pubDate, err := time.Parse(time.RFC1123Z, item.Published)
@@ -190,7 +204,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("[ERROR] can't open db, %v", err)
 	}
-	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_TOKEN"))
+	bot, err := tgbotapi.NewBotAPI(Token)
 	if err != nil {
 		log.Fatalf("[ERROR] telegram api, %v", err)
 	}
