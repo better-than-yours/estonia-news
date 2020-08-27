@@ -16,6 +16,15 @@ import (
 	"github.com/lafin/estonia-news/rest"
 )
 
+// ChatID - Telegram chat ID
+var ChatID int64 = -1001369010280
+
+// TimeoutBetweenLoops - Main loop timeout
+var TimeoutBetweenLoops = 5 * time.Minute
+
+// TimeoutBetweenMessages - timeout between attempts to send a message
+var TimeoutBetweenMessages = 5 * time.Second
+
 // MessageConfig - config
 type MessageConfig struct {
 	FeedTitle   string
@@ -28,12 +37,12 @@ type MessageConfig struct {
 func getFeed(url string) *gofeed.Feed {
 	response, err := rest.Get(url)
 	if err != nil {
-		log.Panic(err)
+		log.Fatalf("[ERROR] get feed, %v", err)
 	}
 	fp := gofeed.NewParser()
 	feed, err := fp.ParseString(string(response))
 	if err != nil {
-		log.Panic(err)
+		log.Fatalf("[ERROR] parse feed, %v", err)
 	}
 	return feed
 }
@@ -61,7 +70,7 @@ func getImage(imageURL string) ([]byte, error) {
 	return ioutil.ReadAll(response.Body)
 }
 
-func getMessage(channel string, msg *MessageConfig) (*tgbotapi.PhotoConfig, error) {
+func createNewMessageObject(msg *MessageConfig) (*tgbotapi.PhotoConfig, error) {
 	content, err := getImage(msg.ImageURL)
 	if err != nil {
 		return nil, err
@@ -69,7 +78,7 @@ func getMessage(channel string, msg *MessageConfig) (*tgbotapi.PhotoConfig, erro
 	file := tgbotapi.FileBytes{Name: msg.ImageURL, Bytes: content}
 	return &tgbotapi.PhotoConfig{
 		BaseFile: tgbotapi.BaseFile{
-			BaseChat:    tgbotapi.BaseChat{ChannelUsername: channel},
+			BaseChat:    tgbotapi.BaseChat{ChatID: ChatID},
 			File:        file,
 			UseExisting: false,
 		},
@@ -78,36 +87,95 @@ func getMessage(channel string, msg *MessageConfig) (*tgbotapi.PhotoConfig, erro
 	}, nil
 }
 
-func sendMessage(db *proc.Processor, item *gofeed.Item, bot *tgbotapi.BotAPI, msg *tgbotapi.PhotoConfig) error {
-	found := false
+func createEditMessageObject(messageID int, msg *MessageConfig) *tgbotapi.EditMessageCaptionConfig {
+	return &tgbotapi.EditMessageCaptionConfig{
+		BaseEdit: tgbotapi.BaseEdit{
+			ChatID:    ChatID,
+			MessageID: messageID,
+		},
+		Caption:   getText(msg),
+		ParseMode: tgbotapi.ModeHTML,
+	}
+}
+
+func send(bot *tgbotapi.BotAPI, db *proc.Processor, feed *gofeed.Feed, item *gofeed.Item) error {
 	entries, err := db.LoadEntry()
 	if err != nil {
 		return err
 	}
 	for _, entry := range *entries {
 		if entry.GUID == item.GUID {
-			found = true
+			pubDate, parseDateErr := time.Parse(time.RFC1123Z, item.Published)
+			if parseDateErr != nil {
+				log.Fatalf("[ERROR] parse date, %v", err)
+			}
+			if entry.Published != pubDate {
+				log.Printf("[INFO] send edit item, %v", item.GUID)
+				if editMessageErr := editMessage(bot, db, feed, item, entry); editMessageErr != nil {
+					return editMessageErr
+				}
+			}
+			return nil
 		}
 	}
-	if !found {
-		sendedMsg, err := bot.Send(msg)
-		if err != nil {
-			return err
-		}
-		pubDate, err := time.Parse(time.RFC1123Z, item.Published)
-		if err != nil {
-			log.Panic(err)
-		}
-		if _, err := db.SaveEntry(model.Entry{GUID: item.GUID, Link: item.Link, Title: item.Title, Published: pubDate, MessageID: sendedMsg.MessageID}); err != nil {
-			return err
-		}
-		time.Sleep(5 * time.Second)
+	log.Printf("[INFO] send new item, %v", item.GUID)
+	err = addMessage(bot, db, feed, item)
+	if err != nil {
+		return err
+	}
+	time.Sleep(TimeoutBetweenMessages)
+	return nil
+}
+
+func addMessage(bot *tgbotapi.BotAPI, db *proc.Processor, feed *gofeed.Feed, item *gofeed.Item) error {
+	msg, err := createNewMessageObject(&MessageConfig{
+		FeedTitle:   feed.Title,
+		Title:       item.Title,
+		Description: item.Description,
+		Link:        item.Link,
+		ImageURL:    getImageURL(item),
+	})
+	if err != nil {
+		log.Fatalf("[ERROR] get message, %v", err)
+	}
+	sendedMsg, err := bot.Send(msg)
+	if err != nil {
+		return err
+	}
+	pubDate, err := time.Parse(time.RFC1123Z, item.Published)
+	if err != nil {
+		log.Fatalf("[ERROR] parse date, %v", err)
+	}
+	if _, err := db.SaveEntry(model.Entry{GUID: item.GUID, Link: item.Link, Title: item.Title, Published: pubDate, MessageID: sendedMsg.MessageID}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func editMessage(bot *tgbotapi.BotAPI, db *proc.Processor, feed *gofeed.Feed, item *gofeed.Item, entry model.Entry) error {
+	msg := createEditMessageObject(entry.MessageID, &MessageConfig{
+		FeedTitle:   feed.Title,
+		Title:       item.Title,
+		Description: item.Description,
+		Link:        item.Link,
+		ImageURL:    getImageURL(item),
+	})
+	_, err := bot.Send(msg)
+	if err != nil {
+		return err
+	}
+	pubDate, err := time.Parse(time.RFC1123Z, item.Published)
+	if err != nil {
+		log.Fatalf("[ERROR] parse date, %v", err)
+	}
+	entry.Published = pubDate
+	if _, err := db.SaveEntry(entry); err != nil {
+		return err
 	}
 	return nil
 }
 
 func main() {
-	channelUsername := "@ee_news"
 	providers := []struct {
 		URL string
 	}{
@@ -124,12 +192,12 @@ func main() {
 	}
 	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_TOKEN"))
 	if err != nil {
-		log.Panic(err)
+		log.Fatalf("[ERROR] telegram api, %v", err)
 	}
 	bot.Debug = os.Getenv("DEBUG") == "true"
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(TimeoutBetweenLoops)
 	quit := make(chan struct{})
 	for {
 		select {
@@ -139,23 +207,14 @@ func main() {
 				for _, item := range feed.Items {
 					pubDate, err := time.Parse(time.RFC1123Z, item.Published)
 					if err != nil {
-						log.Panic(err)
+						log.Fatalf("[ERROR] parse date, %v", err)
 					}
 					if pubDate.Add(10 * time.Hour).Before(time.Now()) {
 						continue
 					}
-					msg, err := getMessage(channelUsername, &MessageConfig{
-						FeedTitle:   feed.Title,
-						Title:       item.Title,
-						Description: item.Description,
-						Link:        item.Link,
-						ImageURL:    getImageURL(item),
-					})
-					if err != nil {
-						log.Panic(err)
-					}
-					if err := sendMessage(db, item, bot, msg); err != nil {
-						log.Panic(err)
+					log.Printf("[INFO] send item, %v", item.GUID)
+					if err := send(bot, db, feed, item); err != nil {
+						log.Fatalf("[ERROR] send, %v", err)
 					}
 				}
 			}

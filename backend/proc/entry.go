@@ -14,7 +14,7 @@ import (
 func (b Processor) SaveEntry(item model.Entry) (*model.Entry, error) {
 	name := "entry"
 	item.Date = item.GetDate()
-	key, err := item.GetKey([]byte(item.Link))
+	key, err := item.GetKey([]byte(item.GUID))
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +29,7 @@ func (b Processor) SaveEntry(item model.Entry) (*model.Entry, error) {
 		if err != nil {
 			return err
 		}
-		log.Printf("[INFO] save %s - %s - %s", string(key), name, item.Link)
+		log.Printf("[INFO] save %s - %s - %s", string(key), name, item.GUID)
 		err = bucket.Put(key, data)
 		if err != nil {
 			return err
@@ -66,7 +66,7 @@ func (b Processor) LoadEntry() (*[]model.Entry, error) {
 }
 
 // DeleteEntry - delete a record and associated access
-func (b Processor) DeleteEntry(link string) error {
+func (b Processor) DeleteEntry(guid string) error {
 	err := b.Store.Update(func(tx *bolt.Tx) error {
 		name := "entry"
 		bucket := tx.Bucket([]byte(name))
@@ -81,7 +81,7 @@ func (b Processor) DeleteEntry(link string) error {
 				log.Printf("[WARN] failed to unmarshal, %v", err)
 				continue
 			}
-			if link == item.Link {
+			if guid == item.GUID {
 				if err := bucket.Delete(k); err != nil {
 					log.Printf("[WARN] failed to remove entry, %v", err)
 					continue
