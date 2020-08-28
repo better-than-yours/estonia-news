@@ -24,19 +24,28 @@ var ChatID = os.Getenv("TELEGRAM_CHAT_ID")
 // Token - Telegram token
 var Token = os.Getenv("TELEGRAM_TOKEN")
 
+// Lang - language for sources
+var Lang = os.Getenv("LANG")
+
 // TimeoutBetweenLoops - Main loop timeout
 var TimeoutBetweenLoops = 5 * time.Minute
 
 // TimeoutBetweenMessages - timeout between attempts to send a message
 var TimeoutBetweenMessages = 5 * time.Second
 
-// MessageConfig - config
-type MessageConfig struct {
+// Message - config
+type Message struct {
 	FeedTitle   string
 	Title       string
 	Description string
 	Link        string
 	ImageURL    string
+}
+
+// Provider - config
+type Provider struct {
+	URL  string
+	Lang string
 }
 
 func getFeed(url string) *gofeed.Feed {
@@ -62,7 +71,7 @@ func getImageURL(item *gofeed.Item) string {
 	return url
 }
 
-func getText(msg *MessageConfig) string {
+func getText(msg *Message) string {
 	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=\"%s\">%s</a>", msg.Title, msg.Description, msg.Link, msg.FeedTitle)
 }
 
@@ -75,7 +84,7 @@ func getImage(imageURL string) ([]byte, error) {
 	return ioutil.ReadAll(response.Body)
 }
 
-func createNewMessageObject(msg *MessageConfig) (*tgbotapi.PhotoConfig, error) {
+func createNewMessageObject(msg *Message) (*tgbotapi.PhotoConfig, error) {
 	chatID, err := strconv.ParseInt(ChatID, 10, 64)
 	if err != nil {
 		return nil, err
@@ -96,7 +105,7 @@ func createNewMessageObject(msg *MessageConfig) (*tgbotapi.PhotoConfig, error) {
 	}, nil
 }
 
-func createEditMessageObject(messageID int, msg *MessageConfig) (*tgbotapi.EditMessageCaptionConfig, error) {
+func createEditMessageObject(messageID int, msg *Message) (*tgbotapi.EditMessageCaptionConfig, error) {
 	chatID, err := strconv.ParseInt(ChatID, 10, 64)
 	if err != nil {
 		return nil, err
@@ -163,7 +172,7 @@ func sendMessage(bot *tgbotapi.BotAPI, db *proc.Processor, item *gofeed.Item, ms
 }
 
 func addMessage(bot *tgbotapi.BotAPI, db *proc.Processor, feed *gofeed.Feed, item *gofeed.Item) error {
-	msg, err := createNewMessageObject(&MessageConfig{
+	msg, err := createNewMessageObject(&Message{
 		FeedTitle:   feed.Title,
 		Title:       item.Title,
 		Description: item.Description,
@@ -177,7 +186,7 @@ func addMessage(bot *tgbotapi.BotAPI, db *proc.Processor, feed *gofeed.Feed, ite
 }
 
 func editMessage(bot *tgbotapi.BotAPI, db *proc.Processor, feed *gofeed.Feed, item *gofeed.Item, entry model.Entry) error {
-	msg, err := createEditMessageObject(entry.MessageID, &MessageConfig{
+	msg, err := createEditMessageObject(entry.MessageID, &Message{
 		FeedTitle:   feed.Title,
 		Title:       item.Title,
 		Description: item.Description,
@@ -191,17 +200,25 @@ func editMessage(bot *tgbotapi.BotAPI, db *proc.Processor, feed *gofeed.Feed, it
 }
 
 func main() {
-	providers := []struct {
-		URL string
-	}{
+	providers := []Provider{
 		{
-			URL: "https://news.postimees.ee/rss",
+			URL:  "https://news.postimees.ee/rss",
+			Lang: "ENG",
 		},
 		{
-			URL: "https://news.err.ee/rss",
+			URL:  "https://news.err.ee/rss",
+			Lang: "ENG",
+		},
+		{
+			URL:  "https://rus.postimees.ee/rss",
+			Lang: "RUS",
+		},
+		{
+			URL:  "https://rus.err.ee/rss",
+			Lang: "RUS",
 		},
 	}
-	db, err := proc.NewBoltDB("var/store.bdb")
+	db, err := proc.NewBoltDB(fmt.Sprintf("var/store-%v.bdb", Lang))
 	if err != nil {
 		log.Fatalf("[ERROR] can't open db, %v", err)
 	}
@@ -218,6 +235,9 @@ func main() {
 		select {
 		case <-ticker.C:
 			for _, provider := range providers {
+				if provider.Lang != Lang {
+					continue
+				}
 				feed := getFeed(provider.URL)
 				for _, item := range feed.Items {
 					pubDate, err := time.Parse(time.RFC1123Z, item.Published)
