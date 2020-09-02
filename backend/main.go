@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -71,8 +72,13 @@ func getImageURL(item *gofeed.Item) string {
 	return url
 }
 
+func formatText(text string) string {
+	r := regexp.MustCompile(`(\n\n)+|(\s)+`)
+	return r.ReplaceAllString(strings.TrimSpace(text), "$1$2")
+}
+
 func getText(msg *Message) string {
-	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=\"%s\">%s</a>", msg.Title, msg.Description, msg.Link, msg.FeedTitle)
+	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=\"%s\">%s</a>", formatText(msg.Title), formatText(msg.Description), msg.Link, strings.TrimSpace(msg.FeedTitle))
 }
 
 func getImage(imageURL string) ([]byte, error) {
