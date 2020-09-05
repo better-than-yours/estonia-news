@@ -12,21 +12,14 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/joho/godotenv"
 	"github.com/mmcdole/gofeed"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
 	"github.com/lafin/estonia-news/model"
-	"github.com/lafin/estonia-news/proc"
 	"github.com/lafin/estonia-news/rest"
 )
-
-// ChatID - Telegram chat ID
-var ChatID = os.Getenv("TELEGRAM_CHAT_ID")
-
-// Token - Telegram token
-var Token = os.Getenv("TELEGRAM_TOKEN")
-
-// Lang - language for sources
-var Lang = os.Getenv("LANG")
 
 // TimeoutBetweenLoops - Main loop timeout
 var TimeoutBetweenLoops = 5 * time.Minute
@@ -43,10 +36,14 @@ type Message struct {
 	ImageURL    string
 }
 
-// Provider - config
-type Provider struct {
-	URL  string
-	Lang string
+// Params - params
+type Params struct {
+	Bot      *tgbotapi.BotAPI
+	DB       *gorm.DB
+	Feed     *gofeed.Feed
+	Item     *gofeed.Item
+	Provider model.Provider
+	ChatID   int64
 }
 
 func getFeed(url string) *gofeed.Feed {
@@ -90,11 +87,7 @@ func getImage(imageURL string) ([]byte, error) {
 	return ioutil.ReadAll(response.Body)
 }
 
-func createNewMessageObject(msg *Message) (*tgbotapi.PhotoConfig, error) {
-	chatID, err := strconv.ParseInt(ChatID, 10, 64)
-	if err != nil {
-		return nil, err
-	}
+func createNewMessageObject(chatID int64, msg *Message) (*tgbotapi.PhotoConfig, error) {
 	content, err := getImage(msg.ImageURL)
 	if err != nil {
 		return nil, err
@@ -111,11 +104,7 @@ func createNewMessageObject(msg *Message) (*tgbotapi.PhotoConfig, error) {
 	}, nil
 }
 
-func createEditMessageObject(messageID int, msg *Message) (*tgbotapi.EditMessageCaptionConfig, error) {
-	chatID, err := strconv.ParseInt(ChatID, 10, 64)
-	if err != nil {
-		return nil, err
-	}
+func createEditMessageObject(chatID int64, messageID int, msg *Message) *tgbotapi.EditMessageCaptionConfig {
 	return &tgbotapi.EditMessageCaptionConfig{
 		BaseEdit: tgbotapi.BaseEdit{
 			ChatID:    chatID,
@@ -123,7 +112,7 @@ func createEditMessageObject(messageID int, msg *Message) (*tgbotapi.EditMessage
 		},
 		Caption:   getText(msg),
 		ParseMode: tgbotapi.ModeHTML,
-	}, nil
+	}
 }
 
 func hasChanges(item *gofeed.Item, entry model.Entry) bool {
@@ -133,24 +122,26 @@ func hasChanges(item *gofeed.Item, entry model.Entry) bool {
 	return false
 }
 
-func send(bot *tgbotapi.BotAPI, db *proc.Processor, feed *gofeed.Feed, item *gofeed.Item) error {
-	entries, err := db.LoadEntry()
-	if err != nil {
-		return err
+func send(params *Params) error {
+	var entries []model.Entry
+	result := params.DB.Where("published > NOW() - INTERVAL '24 hours'").Find(&entries)
+	if result.Error != nil {
+		return result.Error
 	}
-	for _, entry := range *entries {
-		if entry.GUID == item.GUID {
-			if hasChanges(item, entry) {
-				log.Printf("[INFO] send edit item, %v", item.GUID)
-				if editMessageErr := editMessage(bot, db, feed, item, entry); editMessageErr != nil {
+	var Item = params.Item
+	for _, entry := range entries {
+		if entry.GUID == Item.GUID {
+			if hasChanges(Item, entry) {
+				log.Printf("[INFO] send edit item, %v", Item.GUID)
+				if editMessageErr := editMessage(params, entry); editMessageErr != nil {
 					return editMessageErr
 				}
 			}
 			return nil
 		}
 	}
-	log.Printf("[INFO] send new item, %v", item.GUID)
-	err = addMessage(bot, db, feed, item)
+	log.Printf("[INFO] send new item, %v", Item.GUID)
+	err := addMessage(params)
 	if err != nil {
 		return err
 	}
@@ -158,8 +149,8 @@ func send(bot *tgbotapi.BotAPI, db *proc.Processor, feed *gofeed.Feed, item *gof
 	return nil
 }
 
-func sendMessage(bot *tgbotapi.BotAPI, db *proc.Processor, item *gofeed.Item, msg tgbotapi.Chattable) error {
-	sendedMsg, err := bot.Send(msg)
+func sendMessage(params *Params, msg tgbotapi.Chattable) error {
+	sendedMsg, err := params.Bot.Send(msg)
 	if err != nil {
 		if strings.Contains(err.Error(), "message is not modified") {
 			log.Printf("[INFO] send message, %v", err)
@@ -167,73 +158,71 @@ func sendMessage(bot *tgbotapi.BotAPI, db *proc.Processor, item *gofeed.Item, ms
 			return err
 		}
 	}
-	pubDate, err := time.Parse(time.RFC1123Z, item.Published)
+	var Item = params.Item
+	pubDate, err := time.Parse(time.RFC1123Z, Item.Published)
 	if err != nil {
 		log.Fatalf("[ERROR] parse date, %v", err)
 	}
-	if _, err := db.SaveEntry(model.Entry{GUID: item.GUID, Link: item.Link, Title: item.Title, Description: item.Description, Published: pubDate, MessageID: sendedMsg.MessageID}); err != nil {
-		return err
+	result := params.DB.Create(&model.Entry{GUID: Item.GUID, Provider: params.Provider, Link: Item.Link, Title: Item.Title, Description: Item.Description, Published: pubDate, MessageID: sendedMsg.MessageID})
+	if result.Error != nil {
+		return result.Error
 	}
 	return nil
 }
 
-func addMessage(bot *tgbotapi.BotAPI, db *proc.Processor, feed *gofeed.Feed, item *gofeed.Item) error {
-	msg, err := createNewMessageObject(&Message{
-		FeedTitle:   feed.Title,
-		Title:       item.Title,
-		Description: item.Description,
-		Link:        item.Link,
-		ImageURL:    getImageURL(item),
+func addMessage(params *Params) error {
+	var Item = params.Item
+	msg, err := createNewMessageObject(params.ChatID, &Message{
+		FeedTitle:   params.Feed.Title,
+		Title:       Item.Title,
+		Description: Item.Description,
+		Link:        Item.Link,
+		ImageURL:    getImageURL(Item),
 	})
 	if err != nil {
 		log.Fatalf("[ERROR] get message, %v", err)
 	}
-	return sendMessage(bot, db, item, msg)
+	return sendMessage(params, msg)
 }
 
-func editMessage(bot *tgbotapi.BotAPI, db *proc.Processor, feed *gofeed.Feed, item *gofeed.Item, entry model.Entry) error {
-	msg, err := createEditMessageObject(entry.MessageID, &Message{
-		FeedTitle:   feed.Title,
-		Title:       item.Title,
-		Description: item.Description,
-		Link:        item.Link,
-		ImageURL:    getImageURL(item),
+func editMessage(params *Params, entry model.Entry) error {
+	var Item = params.Item
+	msg := createEditMessageObject(params.ChatID, entry.MessageID, &Message{
+		FeedTitle:   params.Feed.Title,
+		Title:       Item.Title,
+		Description: Item.Description,
+		Link:        Item.Link,
+		ImageURL:    getImageURL(Item),
 	})
-	if err != nil {
-		log.Fatalf("[ERROR] get message, %v", err)
-	}
-	return sendMessage(bot, db, item, msg)
+	return sendMessage(params, msg)
 }
 
 func main() {
-	providers := []Provider{
-		{
-			URL:  "https://news.postimees.ee/rss",
-			Lang: "ENG",
-		},
-		{
-			URL:  "https://news.err.ee/rss",
-			Lang: "ENG",
-		},
-		{
-			URL:  "https://rus.postimees.ee/rss",
-			Lang: "RUS",
-		},
-		{
-			URL:  "https://rus.err.ee/rss",
-			Lang: "RUS",
-		},
-	}
-	db, err := proc.NewBoltDB(fmt.Sprintf("var/store-%v.bdb", Lang))
+	_ = godotenv.Load()
+	db, err := gorm.Open(postgres.Open(fmt.Sprintf("host=%s user=%s password=%s dbname=%s", os.Getenv("DB_HOST"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), "estonia_news")), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("[ERROR] can't open db, %v", err)
+		log.Fatalf("[ERROR] failed to connect database, %v", err)
 	}
-	bot, err := tgbotapi.NewBotAPI(Token)
+	err = db.AutoMigrate(&model.Entry{}, &model.Provider{})
+	if err != nil {
+		log.Fatalf("[ERROR] db migration, %v", err)
+	}
+	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_TOKEN"))
 	if err != nil {
 		log.Fatalf("[ERROR] telegram api, %v", err)
 	}
+	chatID, err := strconv.ParseInt(os.Getenv("TELEGRAM_CHAT_ID"), 10, 64)
+	if err != nil {
+		log.Fatalf("[ERROR] chat id, %v", err)
+	}
 	bot.Debug = os.Getenv("DEBUG") == "true"
 	log.Printf("Authorized on account %s", bot.Self.UserName)
+
+	var providers []model.Provider
+	result := db.Find(&providers)
+	if result.Error != nil {
+		log.Fatalf("[ERROR] get providers, %v", result.Error)
+	}
 
 	ticker := time.NewTicker(TimeoutBetweenLoops)
 	quit := make(chan struct{})
@@ -241,7 +230,8 @@ func main() {
 		select {
 		case <-ticker.C:
 			for _, provider := range providers {
-				if provider.Lang != Lang {
+				fmt.Println(os.Getenv("LANG_NEWS"))
+				if provider.Lang != os.Getenv("LANG_NEWS") {
 					continue
 				}
 				feed := getFeed(provider.URL)
@@ -250,11 +240,11 @@ func main() {
 					if err != nil {
 						log.Fatalf("[ERROR] parse date, %v", err)
 					}
-					if pubDate.Add(10 * time.Hour).Before(time.Now()) {
+					if pubDate.Add(3 * time.Hour).Before(time.Now()) {
 						continue
 					}
 					log.Printf("[INFO] send item, %v", item.GUID)
-					if err := send(bot, db, feed, item); err != nil {
+					if err := send(&Params{Bot: bot, DB: db, Feed: feed, Item: item, Provider: provider, ChatID: chatID}); err != nil {
 						log.Fatalf("[ERROR] send, %v", err)
 					}
 				}
