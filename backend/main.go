@@ -17,8 +17,8 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"github.com/lafin/estonia-news/model"
-	"github.com/lafin/estonia-news/rest"
+	"github.com/better-than-yours/estonia-news/model"
+	"github.com/better-than-yours/estonia-news/rest"
 )
 
 // TimeoutBetweenLoops - Main loop timeout

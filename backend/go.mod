@@ -1,12 +1,12 @@
-module github.com/lafin/estonia-news
+module github.com/better-than-yours/estonia-news
 
 go 1.15
 
-replace github.com/lafin/estonia-news/model => ./model
+replace github.com/better-than-yours/estonia-news/model => ./model
 
-replace github.com/lafin/estonia-news/proc => ./proc
+replace github.com/better-than-yours/estonia-news/proc => ./proc
 
-replace github.com/lafin/estonia-news/rest => ./rest
+replace github.com/better-than-yours/estonia-news/rest => ./rest
 
 require (
 	github.com/PuerkitoBio/goquery v1.5.1 // indirect
