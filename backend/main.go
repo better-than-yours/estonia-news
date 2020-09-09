@@ -70,8 +70,11 @@ func getImageURL(item *gofeed.Item) string {
 }
 
 func formatText(text string) string {
-	r := regexp.MustCompile(`(\n\n)+|(\s)+`)
-	return r.ReplaceAllString(strings.TrimSpace(text), "$1$2")
+	text = strings.TrimSpace(text)
+	text = regexp.MustCompile(`(\x{00a0})`).ReplaceAllString(text, "\n")
+	text = regexp.MustCompile(`(\s+)`).ReplaceAllString(text, "$1")
+	text = regexp.MustCompile(`(\n)\n+`).ReplaceAllString(text, "$1")
+	return text
 }
 
 func getText(msg *Message) string {
