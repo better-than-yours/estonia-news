@@ -71,7 +71,7 @@ func getImageURL(item *gofeed.Item) string {
 
 func formatText(text string) string {
 	text = strings.TrimSpace(text)
-	text = regexp.MustCompile(`(\x{00a0})`).ReplaceAllString(text, "\n")
+	text = regexp.MustCompile(`([\x{0020}\x{00a0}\x{1680}\x{180e}\x{2000}-\x{200b}\x{202f}\x{205f}\x{3000}\x{feff}])`).ReplaceAllString(text, " ")
 	text = regexp.MustCompile(`(\s+)`).ReplaceAllString(text, "$1")
 	text = regexp.MustCompile(`(\n)\n+`).ReplaceAllString(text, "$1")
 	return text
