@@ -27,6 +27,9 @@ var TimeoutBetweenLoops = 5 * time.Minute
 // TimeoutBetweenMessages - timeout between attempts to send a message
 var TimeoutBetweenMessages = 5 * time.Second
 
+// CheckFromTime - time ago from which should check messages
+var CheckFromTime = 30 * time.Minute
+
 // Message - config
 type Message struct {
 	FeedTitle   string
@@ -44,6 +47,7 @@ type Params struct {
 	Item     *gofeed.Item
 	Provider model.Provider
 	ChatID   int64
+	Lang     string
 }
 
 func getFeed(url string) *gofeed.Feed {
@@ -77,8 +81,22 @@ func formatText(text string) string {
 	return text
 }
 
-func getText(msg *Message) string {
-	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=\"%s\">%s</a>", formatText(msg.Title), formatText(msg.Description), msg.Link, strings.TrimSpace(msg.FeedTitle))
+func getText(params *Params, msg *Message) string {
+	title := formatText(msg.Title)
+	description := formatText(msg.Description)
+	if params.Provider.Lang == "EST" {
+		text, err := rest.Translate(title, "et", "en")
+		if err != nil {
+			log.Fatalf("[ERROR] get translate, %v (%s)", err, title)
+		}
+		title = text
+		text, err = rest.Translate(description, "et", "en")
+		if err != nil {
+			log.Fatalf("[ERROR] get translate, %v (%s)", err, description)
+		}
+		description = text
+	}
+	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=\"%s\">%s</a>", title, description, msg.Link, strings.TrimSpace(msg.FeedTitle))
 }
 
 func getImage(imageURL string) ([]byte, error) {
@@ -90,30 +108,32 @@ func getImage(imageURL string) ([]byte, error) {
 	return ioutil.ReadAll(response.Body)
 }
 
-func createNewMessageObject(chatID int64, msg *Message) (*tgbotapi.PhotoConfig, error) {
+func createNewMessageObject(params *Params, msg *Message) (*tgbotapi.PhotoConfig, error) {
 	content, err := getImage(msg.ImageURL)
 	if err != nil {
 		return nil, err
 	}
 	file := tgbotapi.FileBytes{Name: msg.ImageURL, Bytes: content}
+	text := getText(params, msg)
 	return &tgbotapi.PhotoConfig{
 		BaseFile: tgbotapi.BaseFile{
-			BaseChat:    tgbotapi.BaseChat{ChatID: chatID},
+			BaseChat:    tgbotapi.BaseChat{ChatID: params.ChatID},
 			File:        file,
 			UseExisting: false,
 		},
-		Caption:   getText(msg),
+		Caption:   text,
 		ParseMode: tgbotapi.ModeHTML,
 	}, nil
 }
 
-func createEditMessageObject(chatID int64, messageID int, msg *Message) *tgbotapi.EditMessageCaptionConfig {
+func createEditMessageObject(params *Params, messageID int, msg *Message) *tgbotapi.EditMessageCaptionConfig {
+	text := getText(params, msg)
 	return &tgbotapi.EditMessageCaptionConfig{
 		BaseEdit: tgbotapi.BaseEdit{
-			ChatID:    chatID,
+			ChatID:    params.ChatID,
 			MessageID: messageID,
 		},
-		Caption:   getText(msg),
+		Caption:   text,
 		ParseMode: tgbotapi.ModeHTML,
 	}
 }
@@ -175,7 +195,7 @@ func sendMessage(params *Params, msg tgbotapi.Chattable) error {
 
 func addMessage(params *Params) error {
 	var Item = params.Item
-	msg, err := createNewMessageObject(params.ChatID, &Message{
+	msg, err := createNewMessageObject(params, &Message{
 		FeedTitle:   params.Feed.Title,
 		Title:       Item.Title,
 		Description: Item.Description,
@@ -190,7 +210,7 @@ func addMessage(params *Params) error {
 
 func editMessage(params *Params, entry model.Entry) error {
 	var Item = params.Item
-	msg := createEditMessageObject(params.ChatID, entry.MessageID, &Message{
+	msg := createEditMessageObject(params, entry.MessageID, &Message{
 		FeedTitle:   params.Feed.Title,
 		Title:       Item.Title,
 		Description: Item.Description,
@@ -200,9 +220,29 @@ func editMessage(params *Params, entry model.Entry) error {
 	return sendMessage(params, msg)
 }
 
-func main() {
-	_ = godotenv.Load()
-	db, err := gorm.Open(postgres.Open(fmt.Sprintf("host=%s user=%s password=%s dbname=%s", os.Getenv("DB_HOST"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), "estonia_news")), &gorm.Config{})
+func getProviders(db *gorm.DB) []model.Provider {
+	var providers []model.Provider
+	result := db.Find(&providers)
+	if result.Error != nil {
+		log.Fatalf("[ERROR] get providers, %v", result.Error)
+	}
+	return providers
+}
+
+func connectToTelegram(telegramToken, telegramChatID string) (bot *tgbotapi.BotAPI, chatID int64) {
+	bot, err := tgbotapi.NewBotAPI(telegramToken)
+	if err != nil {
+		log.Fatalf("[ERROR] telegram api, %v", err)
+	}
+	chatID, err = strconv.ParseInt(telegramChatID, 10, 64)
+	if err != nil {
+		log.Fatalf("[ERROR] chat id, %v", err)
+	}
+	return
+}
+
+func connectToDB(dbHost, dbUser, dbPassword, dbName string) *gorm.DB {
+	db, err := gorm.Open(postgres.Open(fmt.Sprintf("host=%s user=%s password=%s dbname=%s", dbHost, dbUser, dbPassword, dbName)), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("[ERROR] failed to connect database, %v", err)
 	}
@@ -210,22 +250,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("[ERROR] db migration, %v", err)
 	}
-	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_TOKEN"))
-	if err != nil {
-		log.Fatalf("[ERROR] telegram api, %v", err)
-	}
-	chatID, err := strconv.ParseInt(os.Getenv("TELEGRAM_CHAT_ID"), 10, 64)
-	if err != nil {
-		log.Fatalf("[ERROR] chat id, %v", err)
-	}
+	return db
+}
+
+func main() {
+	_ = godotenv.Load()
+	db := connectToDB(os.Getenv("DB_HOST"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"))
+	bot, chatID := connectToTelegram(os.Getenv("TELEGRAM_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
 	bot.Debug = os.Getenv("DEBUG") == "true"
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
-	var providers []model.Provider
-	result := db.Find(&providers)
-	if result.Error != nil {
-		log.Fatalf("[ERROR] get providers, %v", result.Error)
-	}
+	providers := getProviders(db)
 
 	ticker := time.NewTicker(TimeoutBetweenLoops)
 	quit := make(chan struct{})
@@ -243,7 +278,7 @@ func main() {
 					if err != nil {
 						log.Fatalf("[ERROR] parse date, %v", err)
 					}
-					if pubDate.Add(3 * time.Hour).Before(time.Now()) {
+					if pubDate.Add(CheckFromTime).Before(time.Now()) {
 						continue
 					}
 					log.Printf("[INFO] send item, %v", item.GUID)
