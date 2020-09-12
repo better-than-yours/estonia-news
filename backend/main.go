@@ -7,18 +7,17 @@ import (
 	"net/http"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/joho/godotenv"
 	"github.com/mmcdole/gofeed"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"github.com/better-than-yours/estonia-news/model"
+	"github.com/better-than-yours/estonia-news/db"
 	"github.com/better-than-yours/estonia-news/rest"
+	"github.com/better-than-yours/estonia-news/tg"
 )
 
 // TimeoutBetweenLoops - Main loop timeout
@@ -45,7 +44,7 @@ type Params struct {
 	DB       *gorm.DB
 	Feed     *gofeed.Feed
 	Item     *gofeed.Item
-	Provider model.Provider
+	Provider db.Provider
 	ChatID   int64
 	Lang     string
 }
@@ -138,7 +137,7 @@ func createEditMessageObject(params *Params, messageID int, msg *Message) *tgbot
 	}
 }
 
-func hasChanges(item *gofeed.Item, entry model.Entry) bool {
+func hasChanges(item *gofeed.Item, entry db.Entry) bool {
 	if entry.Title != item.Title || entry.Link != item.Link || entry.Description != item.Description {
 		return true
 	}
@@ -146,7 +145,7 @@ func hasChanges(item *gofeed.Item, entry model.Entry) bool {
 }
 
 func send(params *Params) error {
-	var entries []model.Entry
+	var entries []db.Entry
 	result := params.DB.Where("published > NOW() - INTERVAL '24 hours'").Find(&entries)
 	if result.Error != nil {
 		return result.Error
@@ -186,7 +185,7 @@ func sendMessage(params *Params, msg tgbotapi.Chattable) error {
 	if err != nil {
 		log.Fatalf("[ERROR] parse date, %v", err)
 	}
-	result := params.DB.Create(&model.Entry{GUID: Item.GUID, Provider: params.Provider, Link: Item.Link, Title: Item.Title, Description: Item.Description, Published: pubDate, MessageID: sendedMsg.MessageID})
+	result := params.DB.Create(&db.Entry{GUID: Item.GUID, Provider: params.Provider, Link: Item.Link, Title: Item.Title, Description: Item.Description, Published: pubDate, MessageID: sendedMsg.MessageID})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -208,7 +207,7 @@ func addMessage(params *Params) error {
 	return sendMessage(params, msg)
 }
 
-func editMessage(params *Params, entry model.Entry) error {
+func editMessage(params *Params, entry db.Entry) error {
 	var Item = params.Item
 	msg := createEditMessageObject(params, entry.MessageID, &Message{
 		FeedTitle:   params.Feed.Title,
@@ -220,47 +219,22 @@ func editMessage(params *Params, entry model.Entry) error {
 	return sendMessage(params, msg)
 }
 
-func getProviders(db *gorm.DB) []model.Provider {
-	var providers []model.Provider
-	result := db.Find(&providers)
+func getProviders(dbConnect *gorm.DB) []db.Provider {
+	var providers []db.Provider
+	result := dbConnect.Find(&providers)
 	if result.Error != nil {
 		log.Fatalf("[ERROR] get providers, %v", result.Error)
 	}
 	return providers
 }
 
-func connectToTelegram(telegramToken, telegramChatID string) (bot *tgbotapi.BotAPI, chatID int64) {
-	bot, err := tgbotapi.NewBotAPI(telegramToken)
-	if err != nil {
-		log.Fatalf("[ERROR] telegram api, %v", err)
-	}
-	chatID, err = strconv.ParseInt(telegramChatID, 10, 64)
-	if err != nil {
-		log.Fatalf("[ERROR] chat id, %v", err)
-	}
-	return
-}
-
-func connectToDB(dbHost, dbUser, dbPassword, dbName string) *gorm.DB {
-	db, err := gorm.Open(postgres.Open(fmt.Sprintf("host=%s user=%s password=%s dbname=%s", dbHost, dbUser, dbPassword, dbName)), &gorm.Config{})
-	if err != nil {
-		log.Fatalf("[ERROR] failed to connect database, %v", err)
-	}
-	err = db.AutoMigrate(&model.Entry{}, &model.Provider{})
-	if err != nil {
-		log.Fatalf("[ERROR] db migration, %v", err)
-	}
-	return db
-}
-
 func main() {
 	_ = godotenv.Load()
-	db := connectToDB(os.Getenv("DB_HOST"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"))
-	bot, chatID := connectToTelegram(os.Getenv("TELEGRAM_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
+	dbConnect := db.Connect(os.Getenv("DB_HOST"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"))
+	bot, chatID := tg.Connect(os.Getenv("TELEGRAM_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
 	bot.Debug = os.Getenv("DEBUG") == "true"
 	log.Printf("Authorized on account %s", bot.Self.UserName)
-
-	providers := getProviders(db)
+	providers := getProviders(dbConnect)
 
 	ticker := time.NewTicker(TimeoutBetweenLoops)
 	quit := make(chan struct{})
@@ -282,7 +256,7 @@ func main() {
 						continue
 					}
 					log.Printf("[INFO] send item, %v", item.GUID)
-					if err := send(&Params{Bot: bot, DB: db, Feed: feed, Item: item, Provider: provider, ChatID: chatID}); err != nil {
+					if err := send(&Params{Bot: bot, DB: dbConnect, Feed: feed, Item: item, Provider: provider, ChatID: chatID}); err != nil {
 						log.Fatalf("[ERROR] send, %v", err)
 					}
 				}

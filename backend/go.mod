@@ -2,16 +2,8 @@ module github.com/better-than-yours/estonia-news
 
 go 1.15
 
-replace github.com/better-than-yours/estonia-news/model => ./model
-
-replace github.com/better-than-yours/estonia-news/proc => ./proc
-
-replace github.com/better-than-yours/estonia-news/rest => ./rest
-
 require (
-	github.com/PuerkitoBio/goquery v1.5.1 // indirect
 	github.com/andybalholm/cascadia v1.2.0 // indirect
-	github.com/codegangsta/cli v1.20.0 // indirect
 	github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible
 	github.com/jackc/pgproto3/v2 v2.0.4 // indirect
 	github.com/joho/godotenv v1.3.0
