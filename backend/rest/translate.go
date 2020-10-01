@@ -2,6 +2,7 @@ package rest
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 )
@@ -15,6 +16,9 @@ func Translate(query, from, to string) (string, error) {
 	var data []interface{}
 	if err := json.Unmarshal(response, &data); err != nil {
 		return "", err
+	}
+	if data == nil {
+		return "", errors.New("empty translation")
 	}
 	return data[0].([]interface{})[0].([]interface{})[0].(string), nil
 }
