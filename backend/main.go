@@ -84,16 +84,20 @@ func getText(params *Params, msg *Message) string {
 	title := formatText(msg.Title)
 	description := formatText(msg.Description)
 	if params.Provider.Lang == "EST" {
-		text, err := rest.Translate(title, "et", "en")
-		if err != nil {
-			log.Fatalf("[ERROR] get translate, %v (%s)", err, title)
+		if title != "" {
+			text, err := rest.Translate(title, "et", "en")
+			if err != nil {
+				log.Fatalf("[ERROR] get translate, %v (%s)", err, title)
+			}
+			title = text
 		}
-		title = text
-		text, err = rest.Translate(description, "et", "en")
-		if err != nil {
-			log.Fatalf("[ERROR] get translate, %v (%s)", err, description)
+		if description != "" {
+			text, err := rest.Translate(description, "et", "en")
+			if err != nil {
+				log.Fatalf("[ERROR] get translate, %v (%s)", err, description)
+			}
+			description = text
 		}
-		description = text
 	}
 	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=\"%s\">%s</a>", title, description, msg.Link, strings.TrimSpace(msg.FeedTitle))
 }
@@ -242,7 +246,6 @@ func main() {
 		select {
 		case <-ticker.C:
 			for _, provider := range providers {
-				fmt.Println(os.Getenv("LANG_NEWS"))
 				if provider.Lang != os.Getenv("LANG_NEWS") {
 					continue
 				}
