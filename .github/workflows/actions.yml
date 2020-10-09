@@ -44,8 +44,8 @@ jobs:
 
       - name: Set env variables
         run: |
-          echo ::set-env name=TAG::$(echo $GITHUB_SHA | head -c7)
-          echo ::set-env name=REPOSITORY::${REPOSITORY:-$GITHUB_REPOSITORY}
+          echo "TAG=$(echo $GITHUB_SHA | head -c7)" >> $GITHUB_ENV
+          echo "REPOSITORY=${REPOSITORY:-$GITHUB_REPOSITORY}" >> $GITHUB_ENV
         env:
           REPOSITORY: ${{ secrets.REPOSITORY }}
 
