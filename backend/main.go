@@ -27,7 +27,7 @@ var TimeoutBetweenLoops = 5 * time.Minute
 var TimeoutBetweenMessages = 5 * time.Second
 
 // CheckFromTime - time ago from which should check messages
-var CheckFromTime = 30 * time.Minute
+var CheckFromTime = 1 * time.Hour
 
 // Message - config
 type Message struct {
@@ -141,6 +141,13 @@ func createEditMessageObject(params *Params, messageID int, msg *Message) *tgbot
 	}
 }
 
+func createDeleteMessageObject(params *Params, messageID int) *tgbotapi.DeleteMessageConfig {
+	return &tgbotapi.DeleteMessageConfig{
+		ChatID:    params.ChatID,
+		MessageID: messageID,
+	}
+}
+
 func hasChanges(item *gofeed.Item, entry db.Entry) bool {
 	if entry.Title != item.Title || entry.Link != item.Link || entry.Description != item.Description {
 		return true
@@ -148,17 +155,12 @@ func hasChanges(item *gofeed.Item, entry db.Entry) bool {
 	return false
 }
 
-func send(params *Params) error {
-	var entries []db.Entry
-	result := params.DB.Where("published > NOW() - INTERVAL '24 hours'").Find(&entries)
-	if result.Error != nil {
-		return result.Error
-	}
+func addRecord(params *Params, entries *[]db.Entry) error {
 	var Item = params.Item
-	for _, entry := range entries {
+	for _, entry := range *entries {
 		if entry.GUID == Item.GUID {
 			if hasChanges(Item, entry) {
-				log.Printf("[INFO] send edit item, %v", Item.GUID)
+				log.Printf("[INFO] send edit item with guid: %v", Item.GUID)
 				if editMessageErr := editMessage(params, entry); editMessageErr != nil {
 					return editMessageErr
 				}
@@ -166,10 +168,22 @@ func send(params *Params) error {
 			return nil
 		}
 	}
-	log.Printf("[INFO] send new item, %v", Item.GUID)
+	log.Printf("[INFO] send new item with guid: %v", Item.GUID)
 	err := addMessage(params)
 	if err != nil {
 		return err
+	}
+	time.Sleep(TimeoutBetweenMessages)
+	return nil
+}
+
+func deleteRecord(params *Params, entry db.Entry) error {
+	if err := deleteMessage(params, entry); err != nil {
+		return err
+	}
+	result := params.DB.Unscoped().Delete(entry)
+	if result.Error != nil {
+		return result.Error
 	}
 	time.Sleep(TimeoutBetweenMessages)
 	return nil
@@ -223,6 +237,15 @@ func editMessage(params *Params, entry db.Entry) error {
 	return sendMessage(params, msg)
 }
 
+func deleteMessage(params *Params, entry db.Entry) error {
+	msg := createDeleteMessageObject(params, entry.MessageID)
+	_, err := params.Bot.Send(msg)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func getProviders(dbConnect *gorm.DB) []db.Provider {
 	var providers []db.Provider
 	result := dbConnect.Find(&providers)
@@ -230,6 +253,42 @@ func getProviders(dbConnect *gorm.DB) []db.Provider {
 		log.Fatalf("[ERROR] get providers, %v", result.Error)
 	}
 	return providers
+}
+
+func deleteDeletedEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.Item) error {
+	for _, entry := range *entries {
+		notFoundEntry := true
+		for _, item := range *items {
+			if entry.GUID == item.GUID {
+				notFoundEntry = false
+				break
+			}
+		}
+		if notFoundEntry {
+			if err := deleteRecord(params, entry); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func addMissingEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.Item) error {
+	for _, item := range *items {
+		pubDate, err := time.Parse(time.RFC1123Z, item.Published)
+		if err != nil {
+			return err
+		}
+		if pubDate.Add(CheckFromTime).Before(time.Now()) {
+			continue
+		}
+		log.Printf("[INFO] add/edit record with guid, %v", item.GUID)
+		params.Item = item
+		if err := addRecord(params, entries); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func main() {
@@ -250,18 +309,17 @@ func main() {
 					continue
 				}
 				feed := getFeed(provider.URL)
-				for _, item := range feed.Items {
-					pubDate, err := time.Parse(time.RFC1123Z, item.Published)
-					if err != nil {
-						log.Fatalf("[ERROR] parse date, %v", err)
-					}
-					if pubDate.Add(CheckFromTime).Before(time.Now()) {
-						continue
-					}
-					log.Printf("[INFO] send item, %v", item.GUID)
-					if err := send(&Params{Bot: bot, DB: dbConnect, Feed: feed, Item: item, Provider: provider, ChatID: chatID}); err != nil {
-						log.Fatalf("[ERROR] send, %v", err)
-					}
+				var entries []db.Entry
+				result := dbConnect.Where("published > NOW() - INTERVAL '6 hours' AND provider_id = ?", provider.ID).Find(&entries)
+				if result.Error != nil {
+					log.Fatalf("[ERROR] query entries, %v", result.Error)
+				}
+				params := &Params{Bot: bot, DB: dbConnect, Feed: feed, Provider: provider, ChatID: chatID}
+				if err := deleteDeletedEntries(params, &entries, &feed.Items); err != nil {
+					log.Fatalf("[ERROR] delete record, %v", err)
+				}
+				if err := addMissingEntries(params, &entries, &feed.Items); err != nil {
+					log.Fatalf("[ERROR] add/edit record, %v", err)
 				}
 			}
 		case <-quit:
