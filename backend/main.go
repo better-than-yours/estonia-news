@@ -179,7 +179,11 @@ func addRecord(params *Params, entries *[]db.Entry) error {
 
 func deleteRecord(params *Params, entry db.Entry) error {
 	if err := deleteMessage(params, entry); err != nil {
-		return err
+		if strings.Contains(err.Error(), "message to delete not found") {
+			log.Printf("[INFO] delete message, %v", err)
+		} else {
+			return err
+		}
 	}
 	result := params.DB.Unscoped().Delete(entry)
 	if result.Error != nil {
