@@ -5,16 +5,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        arch: [x86_64, armhf, arm64]
         include:
-          - arch: x86_64
-            goarch: amd64
-            goarm: ""
-          - arch: armhf
-            goarch: arm
-            goarm: 7
-          - arch: arm64
-            goarch: arm64
-            goarm: ""
+          - { arch: x86_64,  goarch: amd64,  goarm: "" }
+          - { arch: armhf,   goarch: arm,    goarm: 7 }
+          - { arch: arm64,   goarch: arm64,  goarm: "" }
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
