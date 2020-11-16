@@ -277,13 +277,20 @@ func deleteDeletedEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.
 	return nil
 }
 
+func isValidItem(item *gofeed.Item) bool {
+	pubDate, _ := time.Parse(time.RFC1123Z, item.Published)
+	if pubDate.Add(CheckFromTime).Before(time.Now()) {
+		return false
+	}
+	if item.Description == "" {
+		return false
+	}
+	return true
+}
+
 func addMissingEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.Item) error {
 	for _, item := range *items {
-		pubDate, err := time.Parse(time.RFC1123Z, item.Published)
-		if err != nil {
-			return err
-		}
-		if pubDate.Add(CheckFromTime).Before(time.Now()) {
+		if !isValidItem(item) {
 			continue
 		}
 		log.Printf("[INFO] add/edit record with guid, %v", item.GUID)
@@ -295,6 +302,20 @@ func addMissingEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.Ite
 	return nil
 }
 
+func cleanUp(dbConnect *gorm.DB) {
+	ticker := time.NewTicker(24 * time.Hour)
+	quit := make(chan struct{})
+	for {
+		select {
+		case <-ticker.C:
+			dbConnect.Unscoped().Where("published < NOW() - INTERVAL '1 month'").Delete(&db.Entry{})
+		case <-quit:
+			ticker.Stop()
+			return
+		}
+	}
+}
+
 func main() {
 	_ = godotenv.Load()
 	dbConnect := db.Connect(os.Getenv("DB_HOST"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"))
@@ -302,6 +323,8 @@ func main() {
 	bot.Debug = os.Getenv("DEBUG") == "true"
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 	providers := getProviders(dbConnect)
+
+	go cleanUp(dbConnect)
 
 	ticker := time.NewTicker(TimeoutBetweenLoops)
 	quit := make(chan struct{})
@@ -328,7 +351,6 @@ func main() {
 			}
 		case <-quit:
 			ticker.Stop()
-			log.Println("stop")
 			return
 		}
 	}
