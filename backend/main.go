@@ -149,7 +149,7 @@ func createDeleteMessageObject(params *Params, messageID int) *tgbotapi.DeleteMe
 }
 
 func hasChanges(item *gofeed.Item, entry db.Entry) bool {
-	if entry.Title != item.Title || entry.Link != item.Link || entry.Description != item.Description {
+	if entry.Title != item.Title || entry.Description != item.Description || entry.Link != item.Link {
 		return true
 	}
 	return false
@@ -207,7 +207,17 @@ func sendMessage(params *Params, msg tgbotapi.Chattable) error {
 	if err != nil {
 		log.Fatalf("[ERROR] parse date, %v", err)
 	}
-	result := params.DB.Create(&db.Entry{GUID: Item.GUID, Provider: params.Provider, Link: Item.Link, Title: Item.Title, Description: Item.Description, Published: pubDate, MessageID: sendedMsg.MessageID})
+
+	var entry db.Entry
+	result := params.DB.First(&entry, "guid = ?", Item.GUID)
+	if result.RowsAffected == 0 {
+		result = params.DB.Create(&db.Entry{GUID: Item.GUID, Provider: params.Provider, Link: Item.Link, Title: Item.Title, Description: Item.Description, Published: pubDate, MessageID: sendedMsg.MessageID})
+	} else {
+		entry.Title = Item.Title
+		entry.Description = Item.Description
+		entry.Link = Item.Link
+		result = params.DB.Model(&db.Entry{}).Where("guid = ?", Item.GUID).Updates(&entry)
+	}
 	if result.Error != nil {
 		return result.Error
 	}
