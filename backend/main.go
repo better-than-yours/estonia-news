@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -210,13 +211,13 @@ func sendMessage(params *Params, msg tgbotapi.Chattable) error {
 
 	var entry db.Entry
 	result := params.DB.First(&entry, "guid = ?", Item.GUID)
-	if result.RowsAffected == 0 {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		result = params.DB.Create(&db.Entry{GUID: Item.GUID, Provider: params.Provider, Link: Item.Link, Title: Item.Title, Description: Item.Description, Published: pubDate, MessageID: sendedMsg.MessageID})
 	} else {
 		entry.Title = Item.Title
 		entry.Description = Item.Description
 		entry.Link = Item.Link
-		result = params.DB.Model(&db.Entry{}).Where("guid = ?", Item.GUID).Updates(&entry)
+		result = params.DB.Where("guid = ?", Item.GUID).Updates(&entry)
 	}
 	if result.Error != nil {
 		return result.Error

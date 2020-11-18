@@ -2,6 +2,7 @@
 package rest
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -21,6 +22,9 @@ func Get(url string) ([]byte, error) {
 	response, err := client.Get(url)
 	if err != nil {
 		return nil, err
+	}
+	if response.StatusCode >= 400 {
+		return nil, fmt.Errorf("%d", response.StatusCode)
 	}
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
