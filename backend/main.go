@@ -210,7 +210,7 @@ func sendMessage(params *Params, msg tgbotapi.Chattable) error {
 	}
 
 	var entry db.Entry
-	result := params.DB.First(&entry, "guid = ?", Item.GUID)
+	result := params.DB.First(&entry, "guid = ? AND updated_at > NOW() - INTERVAL '6 hours'", Item.GUID)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		result = params.DB.Create(&db.Entry{GUID: Item.GUID, Provider: params.Provider, Link: Item.Link, Title: Item.Title, Description: Item.Description, Published: pubDate, MessageID: sendedMsg.MessageID})
 	} else {
@@ -319,7 +319,7 @@ func cleanUp(dbConnect *gorm.DB) {
 	for {
 		select {
 		case <-ticker.C:
-			dbConnect.Unscoped().Where("published < NOW() - INTERVAL '1 month'").Delete(&db.Entry{})
+			dbConnect.Unscoped().Where("updated_at < NOW() - INTERVAL '1 month'").Delete(&db.Entry{})
 		case <-quit:
 			ticker.Stop()
 			return
@@ -348,7 +348,7 @@ func main() {
 				}
 				feed := getFeed(provider.URL)
 				var entries []db.Entry
-				result := dbConnect.Where("published > NOW() - INTERVAL '6 hours' AND provider_id = ?", provider.ID).Find(&entries)
+				result := dbConnect.Where("updated_at > NOW() - INTERVAL '6 hours' AND provider_id = ?", provider.ID).Find(&entries)
 				if result.Error != nil {
 					log.Fatalf("[ERROR] query entries, %v", result.Error)
 				}
