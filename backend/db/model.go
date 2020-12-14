@@ -4,6 +4,7 @@ package db
 import (
 	"time"
 
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -17,12 +18,14 @@ type Entry struct {
 	Published   time.Time
 	MessageID   int
 	ProviderID  int
-	Provider    Provider `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Categories  pq.StringArray `gorm:"type:text[]"`
+	Provider    Provider       `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 // Provider is a provider structure
 type Provider struct {
 	gorm.Model
-	URL  string
-	Lang string
+	URL               string
+	Lang              string
+	BlockedCategories pq.StringArray `gorm:"type:text[]"`
 }

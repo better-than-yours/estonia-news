@@ -35,19 +35,21 @@ type Message struct {
 	FeedTitle   string
 	Title       string
 	Description string
+	Categories  []string
 	Link        string
 	ImageURL    string
 }
 
 // Params - params
 type Params struct {
-	Bot      *tgbotapi.BotAPI
-	DB       *gorm.DB
-	Feed     *gofeed.Feed
-	Item     *gofeed.Item
-	Provider db.Provider
-	ChatID   int64
-	Lang     string
+	Bot               *tgbotapi.BotAPI
+	DB                *gorm.DB
+	Feed              *gofeed.Feed
+	Item              *gofeed.Item
+	Provider          db.Provider
+	ChatID            int64
+	Lang              string
+	BlockedCategories []string
 }
 
 func getFeed(url string) *gofeed.Feed {
@@ -212,7 +214,16 @@ func sendMessage(params *Params, msg tgbotapi.Chattable) error {
 	var entry db.Entry
 	result := params.DB.First(&entry, "guid = ? AND updated_at > NOW() - INTERVAL '2 hours'", Item.GUID)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		result = params.DB.Create(&db.Entry{GUID: Item.GUID, Provider: params.Provider, Link: Item.Link, Title: Item.Title, Description: Item.Description, Published: pubDate, MessageID: sendedMsg.MessageID})
+		result = params.DB.Create(&db.Entry{
+			GUID:        Item.GUID,
+			Provider:    params.Provider,
+			Link:        Item.Link,
+			Title:       Item.Title,
+			Description: Item.Description,
+			Categories:  Item.Categories,
+			Published:   pubDate,
+			MessageID:   sendedMsg.MessageID,
+		})
 	} else {
 		entry.Title = Item.Title
 		entry.Description = Item.Description
@@ -231,6 +242,7 @@ func addMessage(params *Params) error {
 		FeedTitle:   params.Feed.Title,
 		Title:       Item.Title,
 		Description: Item.Description,
+		Categories:  Item.Categories,
 		Link:        Item.Link,
 		ImageURL:    getImageURL(Item),
 	})
@@ -288,8 +300,26 @@ func deleteDeletedEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.
 	return nil
 }
 
-func isValidItem(item *gofeed.Item) bool {
+func intersect(arr1, arr2 []string) []string {
+	m := map[string]int{}
+	var res []string
+	for _, n := range arr1 {
+		m[n]++
+	}
+	for _, n := range arr2 {
+		if m[n] > 0 {
+			res = append(res, n)
+			m[n]--
+		}
+	}
+	return res
+}
+
+func isValidItem(params *Params, item *gofeed.Item) bool {
 	pubDate, _ := time.Parse(time.RFC1123Z, item.Published)
+	if len(intersect(params.BlockedCategories, item.Categories)) > 0 {
+		return false
+	}
 	if pubDate.Add(CheckFromTime).Before(time.Now()) {
 		return false
 	}
@@ -301,7 +331,7 @@ func isValidItem(item *gofeed.Item) bool {
 
 func addMissingEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.Item) error {
 	for _, item := range *items {
-		if !isValidItem(item) {
+		if !isValidItem(params, item) {
 			continue
 		}
 		log.Printf("[INFO] add/edit record with guid, %v", item.GUID)
@@ -352,7 +382,7 @@ func main() {
 				if result.Error != nil {
 					log.Fatalf("[ERROR] query entries, %v", result.Error)
 				}
-				params := &Params{Bot: bot, DB: dbConnect, Feed: feed, Provider: provider, ChatID: chatID}
+				params := &Params{Bot: bot, DB: dbConnect, Feed: feed, Provider: provider, ChatID: chatID, BlockedCategories: provider.BlockedCategories}
 				if err := deleteDeletedEntries(params, &entries, &feed.Items); err != nil {
 					log.Fatalf("[ERROR] delete record, %v", err)
 				}
