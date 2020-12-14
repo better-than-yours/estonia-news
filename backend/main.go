@@ -363,7 +363,6 @@ func main() {
 	bot, chatID := tg.Connect(os.Getenv("TELEGRAM_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
 	bot.Debug = os.Getenv("DEBUG") == "true"
 	log.Printf("Authorized on account %s", bot.Self.UserName)
-	providers := getProviders(dbConnect)
 
 	go cleanUp(dbConnect)
 
@@ -372,6 +371,7 @@ func main() {
 	for {
 		select {
 		case <-ticker.C:
+			providers := getProviders(dbConnect)
 			for _, provider := range providers {
 				if provider.Lang != os.Getenv("LANG_NEWS") {
 					continue
