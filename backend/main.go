@@ -3,9 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -17,7 +15,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/better-than-yours/estonia-news/db"
-	"github.com/better-than-yours/estonia-news/rest"
+	"github.com/better-than-yours/estonia-news/http"
 	"github.com/better-than-yours/estonia-news/tg"
 )
 
@@ -52,19 +50,6 @@ type Params struct {
 	BlockedCategories []string
 }
 
-func getFeed(url string) *gofeed.Feed {
-	response, err := rest.Get(url)
-	if err != nil {
-		log.Fatalf("[ERROR] get feed, %v", err)
-	}
-	fp := gofeed.NewParser()
-	feed, err := fp.ParseString(string(response))
-	if err != nil {
-		log.Fatalf("[ERROR] parse feed, %v", err)
-	}
-	return feed
-}
-
 func getImageURL(item *gofeed.Item) string {
 	var url string = ""
 	if len(item.Enclosures) > 0 && item.Enclosures[0].URL != "" {
@@ -88,14 +73,14 @@ func getText(params *Params, msg *Message) string {
 	description := formatText(msg.Description)
 	if params.Provider.Lang == "EST" {
 		if title != "" {
-			text, err := rest.Translate(title, "et", "en")
+			text, err := http.Translate(title, "et", "en")
 			if err != nil {
 				log.Fatalf("[ERROR] get translate, %v (%s)", err, title)
 			}
 			title = text
 		}
 		if description != "" {
-			text, err := rest.Translate(description, "et", "en")
+			text, err := http.Translate(description, "et", "en")
 			if err != nil {
 				log.Fatalf("[ERROR] get translate, %v (%s)", err, description)
 			}
@@ -105,17 +90,8 @@ func getText(params *Params, msg *Message) string {
 	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=\"%s\">%s</a>", title, description, msg.Link, strings.TrimSpace(msg.FeedTitle))
 }
 
-func getImage(imageURL string) ([]byte, error) {
-	response, err := http.Get(imageURL) // #nosec G107
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-	return ioutil.ReadAll(response.Body)
-}
-
 func createNewMessageObject(params *Params, msg *Message) (*tgbotapi.PhotoConfig, error) {
-	content, err := getImage(msg.ImageURL)
+	content, err := http.GetImage(msg.ImageURL)
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +352,10 @@ func main() {
 				if provider.Lang != os.Getenv("LANG_NEWS") {
 					continue
 				}
-				feed := getFeed(provider.URL)
+				feed, err := http.GetFeed(provider.URL)
+				if err != nil {
+					log.Fatalf("[ERROR] get feed, %v", err)
+				}
 				var entries []db.Entry
 				result := dbConnect.Where("updated_at > NOW() - INTERVAL '2 hours' AND provider_id = ?", provider.ID).Find(&entries)
 				if result.Error != nil {

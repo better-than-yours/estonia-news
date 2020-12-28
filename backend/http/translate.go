@@ -1,15 +1,18 @@
-package rest
+// Package http handle work with http
+package http
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
+
+	"github.com/lafin/http"
 )
 
 // Translate - return translated string
 func Translate(query, from, to string) (string, error) {
-	response, err := Get(fmt.Sprintf("https://translate.googleapis.com/translate_a/single?client=gtx&sl=%s&tl=%s&dt=t&q=%s", from, to, url.QueryEscape(query)))
+	response, err := http.Get(fmt.Sprintf("https://translate.googleapis.com/translate_a/single?client=gtx&sl=%s&tl=%s&dt=t&q=%s", from, to, url.QueryEscape(query)), nil)
 	if err != nil {
 		return "", err
 	}
