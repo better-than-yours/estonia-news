@@ -1,11 +1,6 @@
 FROM golang:alpine as build-backend
 
 ARG VERSION
-ENV GOOS linux
-ARG GOARCH
-ENV GOARCH $GOARCH
-ARG GOARM
-ENV GOARM $GOARM
 
 RUN apk update && apk --no-cache add ca-certificates && update-ca-certificates
 COPY backend /srv/backend
