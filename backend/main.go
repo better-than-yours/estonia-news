@@ -68,9 +68,9 @@ func formatText(text string) string {
 	return text
 }
 
-func getText(params *Params, msg *Message) string {
-	title := formatText(msg.Title)
-	description := formatText(msg.Description)
+func getText(params *Params, msg *Message) (title, description string) {
+	title = formatText(msg.Title)
+	description = formatText(msg.Description)
 	if params.Provider.Lang == "EST" {
 		if title != "" {
 			text, err := http.Translate(title, "et", "en")
@@ -87,6 +87,10 @@ func getText(params *Params, msg *Message) string {
 			description = text
 		}
 	}
+	return
+}
+
+func renderMessageBlock(msg *Message, title, description string) string {
 	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=\"%s\">%s</a>", title, description, msg.Link, strings.TrimSpace(msg.FeedTitle))
 }
 
@@ -96,7 +100,8 @@ func createNewMessageObject(params *Params, msg *Message) (*tgbotapi.PhotoConfig
 		return nil, err
 	}
 	file := tgbotapi.FileBytes{Name: msg.ImageURL, Bytes: content}
-	text := getText(params, msg)
+	title, description := getText(params, msg)
+	text := renderMessageBlock(msg, title, description)
 	return &tgbotapi.PhotoConfig{
 		BaseFile: tgbotapi.BaseFile{
 			BaseChat:    tgbotapi.BaseChat{ChatID: params.ChatID},
@@ -109,7 +114,8 @@ func createNewMessageObject(params *Params, msg *Message) (*tgbotapi.PhotoConfig
 }
 
 func createEditMessageObject(params *Params, messageID int, msg *Message) *tgbotapi.EditMessageCaptionConfig {
-	text := getText(params, msg)
+	title, description := getText(params, msg)
+	text := renderMessageBlock(msg, title, description)
 	return &tgbotapi.EditMessageCaptionConfig{
 		BaseEdit: tgbotapi.BaseEdit{
 			ChatID:    params.ChatID,
@@ -305,11 +311,32 @@ func isValidItem(params *Params, item *gofeed.Item) bool {
 	return true
 }
 
+func findSimilarRecord(params *Params, item *gofeed.Item) (bool, error) {
+	var entry db.Entry
+	result := params.DB.First(&entry, "updated_at > NOW() - INTERVAL '1 day' AND provider_id != ? AND similarity(?,title) > 0.85", params.Provider.ID, item.Title)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, result.Error
+	}
+	return true, nil
+}
+
 func addMissingEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.Item) error {
 	for _, item := range *items {
 		if !isValidItem(params, item) {
 			continue
 		}
+
+		found, err := findSimilarRecord(params, item)
+		if err != nil {
+			return err
+		}
+		if found {
+			continue
+		}
+
 		log.Printf("[INFO] add/edit record with guid, %v", item.GUID)
 		params.Item = item
 		if err := addRecord(params, entries); err != nil {
