@@ -313,7 +313,7 @@ func isValidItem(params *Params, item *gofeed.Item) bool {
 
 func findSimilarRecord(params *Params, item *gofeed.Item) (bool, error) {
 	var entry db.Entry
-	result := params.DB.First(&entry, "updated_at > NOW() - INTERVAL '1 day' AND provider_id != ? AND similarity(?,title) > 0.85", params.Provider.ID, item.Title)
+	result := params.DB.First(&entry, "updated_at > NOW() - INTERVAL '1 day' AND provider_id != ? AND similarity(?,title) > 0.3", params.Provider.ID, item.Title)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return false, nil
