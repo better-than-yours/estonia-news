@@ -194,7 +194,7 @@ func sendMessage(params *Params, msg tgbotapi.Chattable) error {
 	}
 
 	var entry db.Entry
-	result := params.DB.First(&entry, "guid = ? AND updated_at > NOW() - INTERVAL '2 hours'", Item.GUID)
+	result := params.DB.First(&entry, "guid = ?", Item.GUID)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		result = params.DB.Create(&db.Entry{
 			GUID:        Item.GUID,
@@ -384,7 +384,7 @@ func main() {
 					log.Fatalf("[ERROR] get feed, %v", err)
 				}
 				var entries []db.Entry
-				result := dbConnect.Where("updated_at > NOW() - INTERVAL '2 hours' AND provider_id = ?", provider.ID).Find(&entries)
+				result := dbConnect.Where("updated_at > NOW() - INTERVAL '6 hours' AND provider_id = ?", provider.ID).Find(&entries)
 				if result.Error != nil {
 					log.Fatalf("[ERROR] query entries, %v", result.Error)
 				}
