@@ -51,7 +51,7 @@ type Params struct {
 }
 
 func getImageURL(item *gofeed.Item) string {
-	var url string = ""
+	var url = ""
 	if len(item.Enclosures) > 0 && item.Enclosures[0].URL != "" {
 		url = item.Enclosures[0].URL
 	} else if len(item.Extensions["media"]["thumbnail"]) > 0 && item.Extensions["media"]["thumbnail"][0].Attrs["url"] != "" {
