@@ -12,6 +12,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/joho/godotenv"
 	"github.com/mmcdole/gofeed"
+	"github.com/thoas/go-funk"
 	"gorm.io/gorm"
 
 	"github.com/better-than-yours/estonia-news/db"
@@ -48,6 +49,7 @@ type Params struct {
 	ChatID            int64
 	Lang              string
 	BlockedCategories []string
+	BlockedWords      []string
 }
 
 func getImageURL(item *gofeed.Item) string {
@@ -282,24 +284,15 @@ func deleteDeletedEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.
 	return nil
 }
 
-func intersect(arr1, arr2 []string) []string {
-	m := map[string]int{}
-	var res []string
-	for _, n := range arr1 {
-		m[n]++
-	}
-	for _, n := range arr2 {
-		if m[n] > 0 {
-			res = append(res, n)
-			m[n]--
-		}
-	}
-	return res
-}
-
 func isValidItem(params *Params, item *gofeed.Item) bool {
 	pubDate, _ := time.Parse(time.RFC1123Z, item.Published)
-	if len(intersect(params.BlockedCategories, item.Categories)) > 0 {
+	if len(funk.IntersectString(params.BlockedCategories, item.Categories)) > 0 {
+		return false
+	}
+	foundBlockedWords := funk.FilterString(params.BlockedWords, func(word string) bool {
+		return strings.Contains(item.Title, word) || strings.Contains(item.Description, word)
+	})
+	if len(foundBlockedWords) > 0 {
 		return false
 	}
 	if pubDate.Add(CheckFromTime).Before(time.Now()) {
@@ -352,7 +345,7 @@ func cleanUp(dbConnect *gorm.DB) {
 	for {
 		select {
 		case <-ticker.C:
-			dbConnect.Unscoped().Where("updated_at < NOW() - INTERVAL '1 month'").Delete(&db.Entry{})
+			dbConnect.Unscoped().Where("updated_at < NOW() - INTERVAL '7 days'").Delete(&db.Entry{})
 		case <-quit:
 			ticker.Stop()
 			return
@@ -368,37 +361,49 @@ func main() {
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
 	go cleanUp(dbConnect)
+	job(dbConnect, bot, chatID)
 
 	ticker := time.NewTicker(TimeoutBetweenLoops)
 	quit := make(chan struct{})
 	for {
 		select {
 		case <-ticker.C:
-			providers := getProviders(dbConnect)
-			for _, provider := range providers {
-				if provider.Lang != os.Getenv("LANG_NEWS") {
-					continue
-				}
-				feed, err := http.GetFeed(provider.URL)
-				if err != nil {
-					log.Fatalf("[ERROR] get feed, %v", err)
-				}
-				var entries []db.Entry
-				result := dbConnect.Where("updated_at > NOW() - INTERVAL '6 hours' AND provider_id = ?", provider.ID).Find(&entries)
-				if result.Error != nil {
-					log.Fatalf("[ERROR] query entries, %v", result.Error)
-				}
-				params := &Params{Bot: bot, DB: dbConnect, Feed: feed, Provider: provider, ChatID: chatID, BlockedCategories: provider.BlockedCategories}
-				if err := deleteDeletedEntries(params, &entries, &feed.Items); err != nil {
-					log.Fatalf("[ERROR] delete record, %v", err)
-				}
-				if err := addMissingEntries(params, &entries, &feed.Items); err != nil {
-					log.Fatalf("[ERROR] add/edit record, %v", err)
-				}
-			}
+			job(dbConnect, bot, chatID)
 		case <-quit:
 			ticker.Stop()
 			return
+		}
+	}
+}
+
+func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
+	providers := getProviders(dbConnect)
+	for _, provider := range providers {
+		if provider.Lang != os.Getenv("LANG_NEWS") {
+			continue
+		}
+		feed, err := http.GetFeed(provider.URL)
+		if err != nil {
+			log.Fatalf("[ERROR] get feed, %v", err)
+		}
+		var entries []db.Entry
+		result := dbConnect.Where("updated_at > NOW() - INTERVAL '6 hours' AND provider_id = ?", provider.ID).Find(&entries)
+		if result.Error != nil {
+			log.Fatalf("[ERROR] query entries, %v", result.Error)
+		}
+		params := &Params{
+			Bot: bot, DB: dbConnect,
+			Feed:              feed,
+			Provider:          provider,
+			ChatID:            chatID,
+			BlockedCategories: provider.BlockedCategories,
+			BlockedWords:      provider.BlockedWords,
+		}
+		if err := deleteDeletedEntries(params, &entries, &feed.Items); err != nil {
+			log.Fatalf("[ERROR] delete record, %v", err)
+		}
+		if err := addMissingEntries(params, &entries, &feed.Items); err != nil {
+			log.Fatalf("[ERROR] add/edit record, %v", err)
 		}
 	}
 }

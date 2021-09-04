@@ -5,13 +5,11 @@ import (
 	"time"
 
 	"github.com/lib/pq"
-	"gorm.io/gorm"
 )
 
 // Entry is a entry structure
 type Entry struct {
-	gorm.Model
-	GUID        string
+	GUID        string `gorm:"index"`
 	Link        string
 	Title       string
 	Description string
@@ -19,13 +17,15 @@ type Entry struct {
 	MessageID   int
 	ProviderID  int
 	Categories  pq.StringArray `gorm:"type:text[]"`
-	Provider    Provider       `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Provider    Provider       `gorm:"index,constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	UpdatedAt   time.Time      `gorm:"index"`
 }
 
 // Provider is a provider structure
 type Provider struct {
-	gorm.Model
+	ID                uint `gorm:"primaryKey"`
 	URL               string
 	Lang              string
 	BlockedCategories pq.StringArray `gorm:"type:text[]"`
+	BlockedWords      pq.StringArray `gorm:"type:text[]"`
 }
