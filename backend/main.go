@@ -172,7 +172,7 @@ func deleteRecord(params *Params, entry db.Entry) error {
 			return err
 		}
 	}
-	result := params.DB.Unscoped().Delete(entry)
+	result := params.DB.Unscoped().Where("guid = ?", entry.GUID).Delete(&db.Entry{})
 	if result.Error != nil {
 		return result.Error
 	}
