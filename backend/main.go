@@ -52,16 +52,6 @@ type Params struct {
 	BlockedWords      []string
 }
 
-func getImageURL(item *gofeed.Item) string {
-	var url = ""
-	if len(item.Enclosures) > 0 && item.Enclosures[0].URL != "" {
-		url = item.Enclosures[0].URL
-	} else if len(item.Extensions["media"]["thumbnail"]) > 0 && item.Extensions["media"]["thumbnail"][0].Attrs["url"] != "" {
-		url = item.Extensions["media"]["thumbnail"][0].Attrs["url"]
-	}
-	return url
-}
-
 func formatText(text string) string {
 	text = strings.TrimSpace(text)
 	text = regexp.MustCompile(`([\x{0020}\x{00a0}\x{1680}\x{180e}\x{2000}-\x{200b}\x{202f}\x{205f}\x{3000}\x{feff}])`).ReplaceAllString(text, " ")
@@ -222,13 +212,17 @@ func sendMessage(params *Params, msg tgbotapi.Chattable) error {
 
 func addMessage(params *Params) error {
 	var Item = params.Item
+	imageURL, err := http.GetImageURL(Item.Link)
+	if err != nil {
+		log.Fatalf("[ERROR] get image url, %v", err)
+	}
 	msg, err := createNewMessageObject(params, &Message{
 		FeedTitle:   params.Feed.Title,
 		Title:       Item.Title,
 		Description: Item.Description,
 		Categories:  Item.Categories,
 		Link:        Item.Link,
-		ImageURL:    getImageURL(Item),
+		ImageURL:    imageURL,
 	})
 	if err != nil {
 		log.Fatalf("[ERROR] get message, %v", err)
@@ -238,12 +232,16 @@ func addMessage(params *Params) error {
 
 func editMessage(params *Params, entry db.Entry) error {
 	var Item = params.Item
+	imageURL, err := http.GetImageURL(Item.Link)
+	if err != nil {
+		log.Fatalf("[ERROR] get image url, %v", err)
+	}
 	msg := createEditMessageObject(params, entry.MessageID, &Message{
 		FeedTitle:   params.Feed.Title,
 		Title:       Item.Title,
 		Description: Item.Description,
 		Link:        Item.Link,
-		ImageURL:    getImageURL(Item),
+		ImageURL:    imageURL,
 	})
 	return sendMessage(params, msg)
 }
