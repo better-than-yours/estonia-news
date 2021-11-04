@@ -54,6 +54,7 @@ type Params struct {
 
 func formatText(text string) string {
 	text = strings.TrimSpace(text)
+	text = regexp.MustCompile(`<img.*?/>`).ReplaceAllString(text, "")
 	text = regexp.MustCompile(`([\x{0020}\x{00a0}\x{1680}\x{180e}\x{2000}-\x{200b}\x{202f}\x{205f}\x{3000}\x{feff}])`).ReplaceAllString(text, " ")
 	text = regexp.MustCompile(`(\s+)`).ReplaceAllString(text, "$1")
 	text = regexp.MustCompile(`(\n)\n+`).ReplaceAllString(text, "$1")
@@ -397,6 +398,20 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 			BlockedCategories: provider.BlockedCategories,
 			BlockedWords:      provider.BlockedWords,
 		}
+		feed.Items = funk.Map(feed.Items, func(item *gofeed.Item) *gofeed.Item {
+			if len(item.GUID) > 0 {
+				return item
+			}
+			link := item.Extensions["feedburner"]["origLink"][0].Value
+			return &gofeed.Item{
+				GUID:        link,
+				Link:        link,
+				Title:       item.Title,
+				Description: item.Description,
+				Categories:  item.Categories,
+				Published:   item.Published,
+			}
+		}).([]*gofeed.Item)
 		if err := deleteDeletedEntries(params, &entries, &feed.Items); err != nil {
 			log.Fatalf("[ERROR] delete record, %v", err)
 		}
