@@ -321,7 +321,6 @@ func addMissingEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.Ite
 		if found {
 			continue
 		}
-		log.Printf("[INFO] add/edit record with guid, %v", item.GUID)
 		params.Item = item
 		if err := addRecord(params, entries); err != nil {
 			return err
