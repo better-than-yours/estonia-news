@@ -27,7 +27,7 @@ var TimeoutBetweenLoops = 5 * time.Minute
 var TimeoutBetweenMessages = 5 * time.Second
 
 // CheckFromTime - time ago from which should check messages
-var CheckFromTime = 1 * time.Hour
+var CheckFromTime = 2 * time.Hour
 
 // Message - config
 type Message struct {
