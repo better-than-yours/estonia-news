@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -317,10 +318,6 @@ func findSimilarRecord(params *Params, item *gofeed.Item) (bool, error) {
 
 func addMissingEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.Item) error {
 	for _, item := range *items {
-		if !isValidItem(params, item) {
-			continue
-		}
-
 		found, err := findSimilarRecord(params, item)
 		if err != nil {
 			return err
@@ -328,7 +325,6 @@ func addMissingEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.Ite
 		if found {
 			continue
 		}
-
 		log.Printf("[INFO] add/edit record with guid, %v", item.GUID)
 		params.Item = item
 		if err := addRecord(params, entries); err != nil {
@@ -412,6 +408,12 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 				Published:   item.Published,
 			}
 		}).([]*gofeed.Item)
+		feed.Items = funk.Filter(feed.Items, func(item *gofeed.Item) bool {
+			return isValidItem(params, item)
+		}).([]*gofeed.Item)
+		sort.Slice(feed.Items, func(i, j int) bool {
+			return feed.Items[i].Published > feed.Items[j].Published
+		})
 		if err := deleteDeletedEntries(params, &entries, &feed.Items); err != nil {
 			log.Fatalf("[ERROR] delete record, %v", err)
 		}
