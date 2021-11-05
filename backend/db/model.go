@@ -13,12 +13,12 @@ type Entry struct {
 	Link        string
 	Title       string
 	Description string
-	Published   time.Time
+	Published   time.Time `gorm:"index"`
 	MessageID   int
-	ProviderID  int
+	ProviderID  int            `gorm:"index"`
 	Categories  pq.StringArray `gorm:"type:text[]"`
 	Provider    Provider       `gorm:"index,constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	UpdatedAt   time.Time      `gorm:"index"`
+	UpdatedAt   time.Time
 }
 
 // Provider is a provider structure
