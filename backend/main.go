@@ -190,6 +190,15 @@ func sendMessage(params *Params, msg tgbotapi.Chattable) error {
 	var entry db.Entry
 	result := params.DB.First(&entry, "guid = ?", Item.GUID)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		for _, category := range Item.Categories {
+			result = db.UpsertCategory(params.DB, &db.Category{
+				Name:     category,
+				Provider: params.Provider,
+			})
+			if result.Error != nil {
+				return result.Error
+			}
+		}
 		result = params.DB.Create(&db.Entry{
 			GUID:        Item.GUID,
 			Provider:    params.Provider,

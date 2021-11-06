@@ -17,7 +17,7 @@ func Connect(dbHost, dbUser, dbPassword, dbName string) *gorm.DB {
 	if err != nil {
 		log.Fatalf("[ERROR] failed to connect database, %v", err)
 	}
-	err = db.AutoMigrate(&Entry{}, &Provider{})
+	err = db.AutoMigrate(&Entry{}, &Provider{}, &Category{})
 	if err != nil {
 		log.Fatalf("[ERROR] db migration, %v", err)
 	}
