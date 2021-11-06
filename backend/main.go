@@ -27,9 +27,6 @@ var TimeoutBetweenLoops = 5 * time.Minute
 // TimeoutBetweenMessages - timeout between attempts to send a message
 var TimeoutBetweenMessages = 5 * time.Second
 
-// HowManyLastHoursNeedCheck - time ago from which should check messages
-var HowManyLastHoursNeedCheck = 12
-
 // Message - config
 type Message struct {
 	FeedTitle   string
@@ -134,18 +131,21 @@ func hasChanges(item *gofeed.Item, entry db.Entry) bool {
 	return false
 }
 
-func addRecord(params *Params, entries *[]db.Entry) error {
+func addRecord(params *Params) error {
 	var Item = params.Item
-	for _, entry := range *entries {
-		if entry.GUID == Item.GUID {
-			if hasChanges(Item, entry) {
-				log.Printf("[INFO] send edit message '%s'", entry.GUID)
-				if editMessageErr := editMessage(params, entry); editMessageErr != nil {
-					return editMessageErr
-				}
+	var entry db.Entry
+	result := params.DB.First(&entry, "guid = ?", Item.GUID)
+	if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		if hasChanges(Item, entry) {
+			log.Printf("[INFO] send edit message '%s'", entry.GUID)
+			if editMessageErr := editMessage(params, entry); editMessageErr != nil {
+				return editMessageErr
 			}
-			return nil
 		}
+		return nil
+	}
+	if !isValidItemByTerm(Item) {
+		return nil
 	}
 	log.Printf("[INFO] send message '%s'", Item.GUID)
 	err := addMessage(params)
@@ -266,9 +266,15 @@ func getProviders(dbConnect *gorm.DB) []db.Provider {
 	return providers
 }
 
-func deleteDeletedEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.Item) error {
-	for _, entry := range *entries {
-		foundEntry := funk.Contains(*items, func(item *gofeed.Item) bool {
+func deleteDeletedEntries(params *Params, items []*gofeed.Item) error {
+	var entries []db.Entry
+	result := params.DB.Where(fmt.Sprintf("updated_at > NOW() - INTERVAL '1 hours' AND provider_id = %d", params.Provider.ID)).Find(&entries)
+	if result.Error != nil {
+		log.Fatalf("[ERROR] query entries, %v", result.Error)
+	}
+	items = funk.Filter(items, isValidItemByTerm).([]*gofeed.Item)
+	for _, entry := range entries {
+		foundEntry := funk.Contains(items, func(item *gofeed.Item) bool {
 			return entry.GUID == item.GUID
 		})
 		if !foundEntry {
@@ -281,8 +287,7 @@ func deleteDeletedEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.
 	return nil
 }
 
-func isValidItem(params *Params, item *gofeed.Item) bool {
-	pubDate, _ := time.Parse(time.RFC1123Z, item.Published)
+func isValidItemByContent(params *Params, item *gofeed.Item) bool {
 	if len(funk.IntersectString(params.BlockedCategories, item.Categories)) > 0 {
 		return false
 	}
@@ -292,13 +297,15 @@ func isValidItem(params *Params, item *gofeed.Item) bool {
 	if len(foundBlockedWords) > 0 {
 		return false
 	}
-	if pubDate.Add(time.Duration(HowManyLastHoursNeedCheck) * time.Hour).Before(time.Now()) {
-		return false
-	}
 	if item.Description == "" {
 		return false
 	}
 	return true
+}
+
+func isValidItemByTerm(item *gofeed.Item) bool {
+	pubDate, _ := time.Parse(time.RFC1123Z, item.Published)
+	return !pubDate.Add(1 * time.Hour).Before(time.Now())
 }
 
 func findSimilarRecord(params *Params, item *gofeed.Item) (bool, error) {
@@ -313,8 +320,8 @@ func findSimilarRecord(params *Params, item *gofeed.Item) (bool, error) {
 	return true, nil
 }
 
-func addMissingEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.Item) error {
-	for _, item := range *items {
+func addMissingEntries(params *Params, items []*gofeed.Item) error {
+	for _, item := range items {
 		found, err := findSimilarRecord(params, item)
 		if err != nil {
 			log.Printf("[INFO] find similar record '%s', %v", item.GUID, err)
@@ -324,7 +331,7 @@ func addMissingEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.Ite
 			continue
 		}
 		params.Item = item
-		if err := addRecord(params, entries); err != nil {
+		if err := addRecord(params); err != nil {
 			log.Printf("[INFO] add record '%s', %v", item.GUID, err)
 			return err
 		}
@@ -379,11 +386,6 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 		if err != nil {
 			log.Fatalf("[ERROR] get feed, %v", err)
 		}
-		var entries []db.Entry
-		result := dbConnect.Where(fmt.Sprintf("updated_at > NOW() - INTERVAL '%d hours' AND provider_id = %d", HowManyLastHoursNeedCheck, provider.ID)).Find(&entries)
-		if result.Error != nil {
-			log.Fatalf("[ERROR] query entries, %v", result.Error)
-		}
 		params := &Params{
 			Bot: bot, DB: dbConnect,
 			Feed:              feed,
@@ -407,15 +409,15 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 			}
 		}).([]*gofeed.Item)
 		feed.Items = funk.Filter(feed.Items, func(item *gofeed.Item) bool {
-			return isValidItem(params, item)
+			return isValidItemByContent(params, item)
 		}).([]*gofeed.Item)
 		sort.Slice(feed.Items, func(i, j int) bool {
 			return feed.Items[i].Published > feed.Items[j].Published
 		})
-		if err := deleteDeletedEntries(params, &entries, &feed.Items); err != nil {
+		if err := deleteDeletedEntries(params, feed.Items); err != nil {
 			log.Fatalf("[ERROR] delete record")
 		}
-		if err := addMissingEntries(params, &entries, &feed.Items); err != nil {
+		if err := addMissingEntries(params, feed.Items); err != nil {
 			log.Fatalf("[ERROR] add/edit record")
 		}
 	}
