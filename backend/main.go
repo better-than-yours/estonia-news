@@ -138,11 +138,13 @@ func addRecord(params *Params) error {
 	var Item = params.Item
 	var entry db.Entry
 	result := params.DB.First(&entry, "guid = ?", Item.GUID)
+	var err error
 	if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		if hasChanges(Item, entry) {
 			log.Printf("[INFO] send edit message '%s'", entry.GUID)
-			if editMessageErr := editMessage(params, entry); editMessageErr != nil {
-				return editMessageErr
+			err = editMessage(params, entry)
+			if err != nil {
+				return err
 			}
 		}
 		return nil
@@ -151,7 +153,7 @@ func addRecord(params *Params) error {
 		return nil
 	}
 	log.Printf("[INFO] send message '%s'", Item.GUID)
-	err := addMessage(params)
+	err = addMessage(params)
 	if err != nil {
 		return err
 	}
@@ -399,7 +401,8 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 			log.Fatalf("[ERROR] get feed, %v", err)
 		}
 		params := &Params{
-			Bot: bot, DB: dbConnect,
+			Bot:               bot,
+			DB:                dbConnect,
 			Feed:              feed,
 			Provider:          provider,
 			ChatID:            chatID,
