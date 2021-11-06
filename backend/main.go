@@ -28,7 +28,7 @@ var TimeoutBetweenLoops = 5 * time.Minute
 var TimeoutBetweenMessages = 5 * time.Second
 
 // HowManyLastHoursNeedCheck - time ago from which should check messages
-var HowManyLastHoursNeedCheck = 2
+var HowManyLastHoursNeedCheck = 12
 
 // Message - config
 type Message struct {
@@ -302,7 +302,7 @@ func isValidItem(params *Params, item *gofeed.Item) bool {
 
 func findSimilarRecord(params *Params, item *gofeed.Item) (bool, error) {
 	var entry db.Entry
-	result := params.DB.First(&entry, "published > NOW() - INTERVAL '1 day' AND provider_id != ? AND similarity(?,title) > 0.3", params.Provider.ID, item.Title)
+	result := params.DB.First(&entry, "updated_at > NOW() - INTERVAL '1 day' AND provider_id != ? AND similarity(?,title) > 0.3", params.Provider.ID, item.Title)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return false, nil
@@ -335,7 +335,7 @@ func cleanUp(dbConnect *gorm.DB) {
 	for {
 		select {
 		case <-ticker.C:
-			dbConnect.Unscoped().Where("published < NOW() - INTERVAL '7 days'").Delete(&db.Entry{})
+			dbConnect.Unscoped().Where("updated_at < NOW() - INTERVAL '7 days'").Delete(&db.Entry{})
 		case <-quit:
 			ticker.Stop()
 			return
@@ -377,7 +377,7 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 			log.Fatalf("[ERROR] get feed, %v", err)
 		}
 		var entries []db.Entry
-		result := dbConnect.Where(fmt.Sprintf("published > NOW() - INTERVAL '%d hours' AND provider_id = %d", HowManyLastHoursNeedCheck, provider.ID)).Find(&entries)
+		result := dbConnect.Where(fmt.Sprintf("updated_at > NOW() - INTERVAL '%d hours' AND provider_id = %d", HowManyLastHoursNeedCheck, provider.ID)).Find(&entries)
 		if result.Error != nil {
 			log.Fatalf("[ERROR] query entries, %v", result.Error)
 		}
