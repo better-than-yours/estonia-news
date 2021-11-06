@@ -69,14 +69,14 @@ func getText(params *Params, msg *Message) (title, description string) {
 		if title != "" {
 			text, err := http.Translate(title, "et", "en")
 			if err != nil {
-				log.Fatalf("[ERROR] get translate, %v (%s)", err, title)
+				log.Fatalf("[ERROR] get translate '%s', %v", title, err)
 			}
 			title = text
 		}
 		if description != "" {
 			text, err := http.Translate(description, "et", "en")
 			if err != nil {
-				log.Fatalf("[ERROR] get translate, %v (%s)", err, description)
+				log.Fatalf("[ERROR] get translate '%s', %v", description, err)
 			}
 			description = text
 		}
@@ -139,7 +139,7 @@ func addRecord(params *Params, entries *[]db.Entry) error {
 	for _, entry := range *entries {
 		if entry.GUID == Item.GUID {
 			if hasChanges(Item, entry) {
-				log.Printf("[INFO] send edit item with guid: %v", Item.GUID)
+				log.Printf("[INFO] send edit message '%s'", entry.GUID)
 				if editMessageErr := editMessage(params, entry); editMessageErr != nil {
 					return editMessageErr
 				}
@@ -147,7 +147,7 @@ func addRecord(params *Params, entries *[]db.Entry) error {
 			return nil
 		}
 	}
-	log.Printf("[INFO] send new item with guid: %v", Item.GUID)
+	log.Printf("[INFO] send message '%s'", Item.GUID)
 	err := addMessage(params)
 	if err != nil {
 		return err
@@ -159,7 +159,7 @@ func addRecord(params *Params, entries *[]db.Entry) error {
 func deleteRecord(params *Params, entry db.Entry) error {
 	if err := deleteMessage(params, entry); err != nil {
 		if strings.Contains(err.Error(), "message to delete not found") {
-			log.Printf("[INFO] delete message, %v", err)
+			log.Printf("[INFO] delete message '%s', %v", entry.GUID, err)
 		} else {
 			return err
 		}
@@ -273,6 +273,7 @@ func deleteDeletedEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.
 		})
 		if !foundEntry {
 			if err := deleteRecord(params, entry); err != nil {
+				log.Printf("[INFO] delete record '%s', %v", entry.GUID, err)
 				return err
 			}
 		}
@@ -316,6 +317,7 @@ func addMissingEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.Ite
 	for _, item := range *items {
 		found, err := findSimilarRecord(params, item)
 		if err != nil {
+			log.Printf("[INFO] find similar record '%s', %v", item.GUID, err)
 			return err
 		}
 		if found {
@@ -323,6 +325,7 @@ func addMissingEntries(params *Params, entries *[]db.Entry, items *[]*gofeed.Ite
 		}
 		params.Item = item
 		if err := addRecord(params, entries); err != nil {
+			log.Printf("[INFO] add record '%s', %v", item.GUID, err)
 			return err
 		}
 	}
@@ -410,10 +413,10 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 			return feed.Items[i].Published > feed.Items[j].Published
 		})
 		if err := deleteDeletedEntries(params, &entries, &feed.Items); err != nil {
-			log.Fatalf("[ERROR] delete record, %v", err)
+			log.Fatalf("[ERROR] delete record")
 		}
 		if err := addMissingEntries(params, &entries, &feed.Items); err != nil {
-			log.Fatalf("[ERROR] add/edit record, %v", err)
+			log.Fatalf("[ERROR] add/edit record")
 		}
 	}
 }
