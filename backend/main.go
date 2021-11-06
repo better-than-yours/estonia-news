@@ -27,6 +27,9 @@ var TimeoutBetweenLoops = 5 * time.Minute
 // TimeoutBetweenMessages - timeout between attempts to send a message
 var TimeoutBetweenMessages = 5 * time.Second
 
+// TimeShift is time shift
+var TimeShift = 1
+
 // Message - config
 type Message struct {
 	FeedTitle   string
@@ -277,7 +280,7 @@ func getProviders(dbConnect *gorm.DB) []db.Provider {
 
 func deleteDeletedEntries(params *Params, items []*gofeed.Item) error {
 	var entries []db.Entry
-	result := params.DB.Where(fmt.Sprintf("updated_at > NOW() - INTERVAL '1 hours' AND provider_id = %d", params.Provider.ID)).Find(&entries)
+	result := params.DB.Where(fmt.Sprintf("published > NOW() - INTERVAL '%d hours' AND provider_id = %d", TimeShift, params.Provider.ID)).Find(&entries)
 	if result.Error != nil {
 		log.Fatalf("[ERROR] query entries, %v", result.Error)
 	}
@@ -314,7 +317,7 @@ func isValidItemByContent(params *Params, item *gofeed.Item) bool {
 
 func isValidItemByTerm(item *gofeed.Item) bool {
 	pubDate, _ := time.Parse(time.RFC1123Z, item.Published)
-	return !pubDate.Add(1 * time.Hour).Before(time.Now())
+	return !pubDate.Add(time.Duration(TimeShift) * time.Hour).Before(time.Now())
 }
 
 func findSimilarRecord(params *Params, item *gofeed.Item) (bool, error) {
