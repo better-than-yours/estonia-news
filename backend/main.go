@@ -53,6 +53,23 @@ type Params struct {
 	BlockedWords      []string
 }
 
+func formatGUID(url string) string {
+	var r *regexp.Regexp
+	r = regexp.MustCompile(`^\w+#\d+$`)
+	if r.MatchString(url) {
+		return url
+	}
+	r = regexp.MustCompile(`err.*?/(\d+)$`)
+	if r.MatchString(url) {
+		return fmt.Sprintf("err#%s", r.FindStringSubmatch(url)[1])
+	}
+	r = regexp.MustCompile(`delfi.*?/(\d+)/.*?$`)
+	if r.MatchString(url) {
+		return fmt.Sprintf("delfi#%s", r.FindStringSubmatch(url)[1])
+	}
+	return ""
+}
+
 func formatText(text string) string {
 	text = strings.TrimSpace(text)
 	text = regexp.MustCompile(`<img.*?/>`).ReplaceAllString(text, "")
@@ -141,7 +158,7 @@ func addRecord(params *Params) error {
 	var err error
 	if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		if hasChanges(Item, entry) {
-			log.Printf("[INFO] send edit message '%s'", entry.GUID)
+			log.Printf("[INFO] send edit message '%s'", formatGUID(entry.GUID))
 			err = editMessage(params, entry)
 			if err != nil {
 				return err
@@ -164,12 +181,12 @@ func addRecord(params *Params) error {
 func deleteRecord(params *Params, entry db.Entry) error {
 	if err := deleteMessage(params, entry); err != nil {
 		if strings.Contains(err.Error(), "message to delete not found") {
-			log.Printf("[INFO] delete message '%s', %v", entry.GUID, err)
+			log.Printf("[INFO] delete message '%s', %v", formatGUID(entry.GUID), err)
 		} else {
 			return err
 		}
 	}
-	result := params.DB.Unscoped().Where("guid = ?", entry.GUID).Delete(&db.Entry{})
+	result := params.DB.Unscoped().Where("guid = ?", formatGUID(entry.GUID)).Delete(&db.Entry{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -195,33 +212,46 @@ func sendMessage(params *Params, msg tgbotapi.Chattable) error {
 	var entry db.Entry
 	result := params.DB.First(&entry, "guid = ?", Item.GUID)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		for _, category := range Item.Categories {
-			result = db.UpsertCategory(params.DB, &db.Category{
-				Name:     category,
-				Provider: params.Provider,
-			})
-			if result.Error != nil {
-				return result.Error
-			}
-		}
-		result = params.DB.Create(&db.Entry{
+		entry = db.Entry{
 			GUID:        Item.GUID,
 			Provider:    params.Provider,
 			Link:        Item.Link,
 			Title:       Item.Title,
 			Description: Item.Description,
-			Categories:  Item.Categories,
 			Published:   pubDate,
 			MessageID:   sendedMsg.MessageID,
-		})
+		}
+		result = params.DB.Create(&entry)
+		if result.Error != nil {
+			return result.Error
+		}
+		var entryToCategory []db.EntryToCategory
+		for _, categoryName := range Item.Categories {
+			category := db.Category{
+				Name:     categoryName,
+				Provider: params.Provider,
+			}
+			result = db.UpsertCategory(params.DB, &category)
+			if result.Error != nil {
+				return result.Error
+			}
+			entryToCategory = append(entryToCategory, db.EntryToCategory{
+				Entry:    entry,
+				Category: category,
+			})
+		}
+		result = params.DB.Create(&entryToCategory)
+		if result.Error != nil {
+			return result.Error
+		}
 	} else {
 		entry.Title = Item.Title
 		entry.Description = Item.Description
 		entry.Link = Item.Link
 		result = params.DB.Where("guid = ?", Item.GUID).Updates(&entry)
-	}
-	if result.Error != nil {
-		return result.Error
+		if result.Error != nil {
+			return result.Error
+		}
 	}
 	return nil
 }
@@ -289,11 +319,11 @@ func deleteDeletedEntries(params *Params, items []*gofeed.Item) error {
 	items = funk.Filter(items, isValidItemByTerm).([]*gofeed.Item)
 	for _, entry := range entries {
 		foundEntry := funk.Contains(items, func(item *gofeed.Item) bool {
-			return entry.GUID == item.GUID
+			return formatGUID(entry.GUID) == item.GUID
 		})
 		if !foundEntry {
 			if err := deleteRecord(params, entry); err != nil {
-				log.Printf("[INFO] delete record '%s', %v", entry.GUID, err)
+				log.Printf("[INFO] delete record '%s', %v", formatGUID(entry.GUID), err)
 				return err
 			}
 		}
@@ -411,11 +441,12 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 		}
 		feed.Items = funk.Map(feed.Items, func(item *gofeed.Item) *gofeed.Item {
 			if len(item.GUID) > 0 {
+				item.GUID = formatGUID(item.GUID)
 				return item
 			}
 			link := item.Extensions["feedburner"]["origLink"][0].Value
 			return &gofeed.Item{
-				GUID:        link,
+				GUID:        formatGUID(link),
 				Link:        link,
 				Title:       item.Title,
 				Description: item.Description,
