@@ -186,7 +186,7 @@ func deleteRecord(params *Params, entry db.Entry) error {
 			return err
 		}
 	}
-	result := params.DB.Unscoped().Where("guid = ?", formatGUID(entry.GUID)).Delete(&db.Entry{})
+	result := params.DB.Unscoped().Where("guid = ?", formatGUID(entry.GUID)).Select("EntryToCategory").Delete(&db.Entry{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -389,7 +389,7 @@ func cleanUp(dbConnect *gorm.DB) {
 	for {
 		select {
 		case <-ticker.C:
-			dbConnect.Unscoped().Where("updated_at < NOW() - INTERVAL '7 days'").Delete(&db.Entry{})
+			dbConnect.Unscoped().Where("updated_at < NOW() - INTERVAL '7 days'").Select("EntryToCategory").Delete(&db.Entry{})
 		case <-quit:
 			ticker.Stop()
 			return
