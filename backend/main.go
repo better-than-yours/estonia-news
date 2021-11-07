@@ -25,7 +25,7 @@ import (
 var TimeoutBetweenLoops = 5 * time.Minute
 
 // TimeoutBetweenMessages - timeout between attempts to send a message
-var TimeoutBetweenMessages = 5 * time.Second
+var TimeoutBetweenMessages = 1 * time.Second
 
 // TimeShift is time shift
 var TimeShift = 1
