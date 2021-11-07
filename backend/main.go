@@ -186,7 +186,12 @@ func deleteRecord(params *Params, entry db.Entry) error {
 			return err
 		}
 	}
-	result := params.DB.Unscoped().Where("guid = ?", formatGUID(entry.GUID)).Select("EntryToCategory").Delete(&db.Entry{})
+	// TODO need to fix it
+	result := params.DB.Unscoped().Where("entry_id = ?", formatGUID(entry.GUID)).Delete(&db.EntryToCategory{})
+	if result.Error != nil {
+		return result.Error
+	}
+	result = params.DB.Unscoped().Where("guid = ?", formatGUID(entry.GUID)).Delete(&db.Entry{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -384,12 +389,14 @@ func addMissingEntries(params *Params, items []*gofeed.Item) error {
 }
 
 func cleanUp(dbConnect *gorm.DB) {
-	ticker := time.NewTicker(24 * time.Hour)
+	ticker := time.NewTicker(1 * time.Second)
 	quit := make(chan struct{})
 	for {
 		select {
 		case <-ticker.C:
-			dbConnect.Unscoped().Where("updated_at < NOW() - INTERVAL '7 days'").Select("EntryToCategory").Delete(&db.Entry{})
+			// TODO need to fix it
+			dbConnect.Unscoped().Select("Entry").Where("entries.updated_at < NOW() - INTERVAL '7 days'").Delete(&db.EntryToCategory{})
+			dbConnect.Unscoped().Where("updated_at < NOW() - INTERVAL '7 days'").Delete(&db.Entry{})
 		case <-quit:
 			ticker.Stop()
 			return
