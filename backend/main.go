@@ -451,10 +451,9 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 				item.GUID = formatGUID(item.GUID)
 				return item
 			}
-			link := item.Extensions["feedburner"]["origLink"][0].Value
 			return &gofeed.Item{
-				GUID:        formatGUID(link),
-				Link:        link,
+				GUID:        formatGUID(item.Link),
+				Link:        item.Link,
 				Title:       item.Title,
 				Description: item.Description,
 				Categories:  item.Categories,
