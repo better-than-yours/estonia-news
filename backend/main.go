@@ -102,7 +102,7 @@ func getText(params *Params, msg *Message) (title, description string) {
 }
 
 func renderMessageBlock(msg *Message, title, description string) string {
-	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=\"%s\">%s</a>", title, description, msg.Link, strings.TrimSpace(msg.FeedTitle))
+	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=\"%q\">%s</a>", title, description, msg.Link, strings.TrimSpace(msg.FeedTitle))
 }
 
 func createNewMessageObject(params *Params, msg *Message) (*tgbotapi.PhotoConfig, error) {
