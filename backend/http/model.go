@@ -11,12 +11,12 @@ import (
 
 // GetFeed - get feed
 func GetFeed(url string) (*gofeed.Feed, error) {
-	response, err := http.Get(url, nil)
+	body, _, err := http.Get(url, nil)
 	if err != nil {
 		return nil, err
 	}
 	fp := gofeed.NewParser()
-	feed, err := fp.ParseString(string(response))
+	feed, err := fp.ParseString(string(body))
 	if err != nil {
 		return nil, err
 	}
@@ -25,11 +25,11 @@ func GetFeed(url string) (*gofeed.Feed, error) {
 
 // GetImage - get a image
 func GetImage(imageURL string) ([]byte, error) {
-	response, err := http.Get(imageURL, nil)
+	body, _, err := http.Get(imageURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	return response, nil
+	return body, nil
 }
 
 // GetImageURL - get a image url by a link
@@ -53,11 +53,11 @@ func GetImageURL(link string) (string, error) {
 		}
 	}
 
-	response, err := http.Get(link, nil)
+	body, _, err := http.Get(link, nil)
 	if err != nil {
 		return "", err
 	}
-	doc, _ := html.Parse(bytes.NewReader(response))
+	doc, _ := html.Parse(bytes.NewReader(body))
 	findImageURL(doc)
 	return imageURL, nil
 }

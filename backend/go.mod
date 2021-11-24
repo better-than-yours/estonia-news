@@ -5,16 +5,19 @@ go 1.15
 require (
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible
+	github.com/jackc/pgx/v4 v4.14.0 // indirect
+	github.com/jinzhu/now v1.1.3 // indirect
 	github.com/joho/godotenv v1.4.0
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/lafin/http v0.0.2
-	github.com/lib/pq v1.10.3
+	github.com/lafin/http v0.0.3
+	github.com/lib/pq v1.10.4
 	github.com/mmcdole/gofeed v1.1.3
 	github.com/mmcdole/goxpp v0.0.0-20200921145534-2f3784f67354 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/technoweenie/multipartstreamer v1.0.1 // indirect
 	github.com/thoas/go-funk v0.9.1
-	golang.org/x/net v0.0.0-20211105192438-b53810dc28af
-	gorm.io/driver/postgres v1.2.1
-	gorm.io/gorm v1.22.2
+	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871 // indirect
+	golang.org/x/net v0.0.0-20211123203042-d83791d6bcd9
+	gorm.io/driver/postgres v1.2.2
+	gorm.io/gorm v1.22.3
 )
