@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"regexp"
 	"sort"
@@ -53,19 +54,19 @@ type Params struct {
 	BlockedWords      []string
 }
 
-func formatGUID(url string) string {
+func formatGUID(path string) string {
 	var r *regexp.Regexp
 	r = regexp.MustCompile(`^\w+#\d+$`)
-	if r.MatchString(url) {
-		return url
+	if r.MatchString(path) {
+		return path
 	}
 	r = regexp.MustCompile(`err.*?/(\d+)$`)
-	if r.MatchString(url) {
-		return fmt.Sprintf("err#%s", r.FindStringSubmatch(url)[1])
+	if r.MatchString(path) {
+		return fmt.Sprintf("err#%s", r.FindStringSubmatch(path)[1])
 	}
 	r = regexp.MustCompile(`delfi.*?/(\d+)/.*?$`)
-	if r.MatchString(url) {
-		return fmt.Sprintf("delfi#%s", r.FindStringSubmatch(url)[1])
+	if r.MatchString(path) {
+		return fmt.Sprintf("delfi#%s", r.FindStringSubmatch(path)[1])
 	}
 	return ""
 }
@@ -102,26 +103,39 @@ func getText(params *Params, msg *Message) (title, description string) {
 }
 
 func renderMessageBlock(msg *Message, title, description string) string {
-	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=\"%q\">%s</a>", title, description, msg.Link, strings.TrimSpace(msg.FeedTitle))
+	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=%q>%s</a>", title, description, msg.Link, strings.TrimSpace(msg.FeedTitle))
 }
 
-func createNewMessageObject(params *Params, msg *Message) (*tgbotapi.PhotoConfig, error) {
-	content, err := http.GetImage(msg.ImageURL)
-	if err != nil {
-		return nil, err
-	}
-	file := tgbotapi.FileBytes{Name: msg.ImageURL, Bytes: content}
+func createNewMessageObject(params *Params, msg *Message) (tgbotapi.Chattable, error) {
 	title, description := getText(params, msg)
 	text := renderMessageBlock(msg, title, description)
-	return &tgbotapi.PhotoConfig{
-		BaseFile: tgbotapi.BaseFile{
-			BaseChat:    tgbotapi.BaseChat{ChatID: params.ChatID},
-			File:        file,
-			UseExisting: false,
-		},
-		Caption:   text,
-		ParseMode: tgbotapi.ModeHTML,
-	}, nil
+
+	var config tgbotapi.Chattable
+	if msg.ImageURL == "" {
+		config = &tgbotapi.MessageConfig{
+			BaseChat:              tgbotapi.BaseChat{ChatID: params.ChatID},
+			Text:                  text,
+			ParseMode:             tgbotapi.ModeHTML,
+			DisableWebPagePreview: true,
+		}
+	} else {
+		content, err := http.GetImage(msg.ImageURL)
+		if err != nil {
+			return nil, err
+		}
+		file := tgbotapi.FileBytes{Name: msg.ImageURL, Bytes: content}
+		config = &tgbotapi.PhotoConfig{
+			BaseFile: tgbotapi.BaseFile{
+				BaseChat:    tgbotapi.BaseChat{ChatID: params.ChatID},
+				File:        file,
+				UseExisting: false,
+			},
+			Caption:   text,
+			ParseMode: tgbotapi.ModeHTML,
+		}
+
+	}
+	return config, nil
 }
 
 func createEditMessageObject(params *Params, messageID int, msg *Message) *tgbotapi.EditMessageCaptionConfig {
@@ -266,6 +280,11 @@ func addMessage(params *Params) error {
 	imageURL, err := http.GetImageURL(Item.Link)
 	if err != nil {
 		log.Fatalf("[ERROR] get image url, %v", err)
+	}
+	_, err = url.ParseRequestURI(imageURL)
+	if err != nil {
+		log.Printf("[WARN] parse image url, %v", err)
+		imageURL = ""
 	}
 	msg, err := createNewMessageObject(params, &Message{
 		FeedTitle:   params.Feed.Title,
