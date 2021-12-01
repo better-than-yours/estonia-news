@@ -195,7 +195,7 @@ func addRecord(params *Params) error {
 func deleteRecord(params *Params, entry db.Entry) error {
 	if err := deleteMessage(params, entry); err != nil {
 		if strings.Contains(err.Error(), "message to delete not found") {
-			log.Printf("[INFO] delete message '%s', %v", formatGUID(entry.GUID), err)
+			log.Printf("[WARN] delete message '%s', %v", formatGUID(entry.GUID), err)
 		} else {
 			return err
 		}
@@ -217,7 +217,9 @@ func sendMessage(params *Params, msg tgbotapi.Chattable) error {
 	sendedMsg, err := params.Bot.Send(msg)
 	if err != nil {
 		if strings.Contains(err.Error(), "message is not modified") {
-			log.Printf("[INFO] send message, %v", err)
+			log.Printf("[WARN] send message, %v", err)
+		} else if strings.Contains(err.Error(), "there is no caption in the message to edit") {
+			log.Printf("[WARN] send message, %v", err)
 		} else {
 			return err
 		}
@@ -347,7 +349,7 @@ func deleteDeletedEntries(params *Params, items []*gofeed.Item) error {
 		})
 		if !foundEntry {
 			if err := deleteRecord(params, entry); err != nil {
-				log.Printf("[INFO] delete record '%s', %v", formatGUID(entry.GUID), err)
+				log.Printf("[WARN] delete record '%s', %v", formatGUID(entry.GUID), err)
 				return err
 			}
 		}
@@ -392,7 +394,7 @@ func addMissingEntries(params *Params, items []*gofeed.Item) error {
 	for _, item := range items {
 		found, err := findSimilarRecord(params, item)
 		if err != nil {
-			log.Printf("[INFO] find similar record '%s', %v", item.GUID, err)
+			log.Printf("[WARN] find similar record '%s', %v", item.GUID, err)
 			return err
 		}
 		if found {
@@ -400,7 +402,7 @@ func addMissingEntries(params *Params, items []*gofeed.Item) error {
 		}
 		params.Item = item
 		if err := addRecord(params); err != nil {
-			log.Printf("[INFO] add record '%s', %v", item.GUID, err)
+			log.Printf("[WARN] add record '%s', %v", item.GUID, err)
 			return err
 		}
 	}
