@@ -16,8 +16,8 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/technoweenie/multipartstreamer v1.0.1 // indirect
 	github.com/thoas/go-funk v0.9.1
-	golang.org/x/crypto v0.0.0-20211209193657-4570a0811e8b // indirect
-	golang.org/x/net v0.0.0-20211209124913-491a49abca63
+	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3 // indirect
+	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f
 	gorm.io/driver/postgres v1.2.3
 	gorm.io/gorm v1.22.4
 )
