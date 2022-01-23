@@ -6,7 +6,6 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible
 	github.com/jackc/pgx/v4 v4.14.1 // indirect
-	github.com/jinzhu/now v1.1.4 // indirect
 	github.com/joho/godotenv v1.4.0
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/lafin/http v0.0.3
@@ -17,7 +16,7 @@ require (
 	github.com/technoweenie/multipartstreamer v1.0.1 // indirect
 	github.com/thoas/go-funk v0.9.1
 	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce // indirect
-	golang.org/x/net v0.0.0-20220114011407-0dd24b26b47d
+	golang.org/x/net v0.0.0-20220121210141-e204ce36a2ba
 	gorm.io/driver/postgres v1.2.3
 	gorm.io/gorm v1.22.5
 )
