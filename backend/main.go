@@ -10,26 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-pkgz/lgr"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/joho/godotenv"
 	"github.com/mmcdole/gofeed"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/thoas/go-funk"
 	"gorm.io/gorm"
-
-	"github.com/better-than-yours/estonia-news/db"
-	"github.com/better-than-yours/estonia-news/http"
-	"github.com/better-than-yours/estonia-news/tg"
 )
-
-var (
-	taskErrors = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "lafin_news_errors",
-	}, []string{"error"})
-)
-var l = lgr.New(lgr.Msec, lgr.Debug, lgr.CallerFile, lgr.CallerFunc)
 
 // TimeoutBetweenLoops - Main loop timeout
 var TimeoutBetweenLoops = 5 * time.Minute
@@ -38,7 +25,7 @@ var TimeoutBetweenLoops = 5 * time.Minute
 var TimeoutBetweenMessages = 1 * time.Second
 
 // TimeShift is time shift
-var TimeShift = 1
+var TimeShift = 3
 
 // Message - config
 type Message struct {
@@ -56,7 +43,7 @@ type Params struct {
 	DB                *gorm.DB
 	Feed              *gofeed.Feed
 	Item              *gofeed.Item
-	Provider          db.Provider
+	Provider          Provider
 	ChatID            int64
 	Lang              string
 	BlockedCategories []string
@@ -94,18 +81,20 @@ func getText(params *Params, msg *Message) (title, description string) {
 	description = formatText(msg.Description)
 	if params.Provider.Lang == "EST" {
 		if title != "" {
-			text, err := http.Translate(title, "et", "en")
+			text, err := Translate(title, "et", "en")
 			if err != nil {
-				l.Logf("FATAL get translate '%s', %v", title, err)
 				taskErrors.With(prometheus.Labels{"error": "get_translate"}).Inc()
+				pushMetrics()
+				l.Logf("FATAL get translate '%s', %v", title, err)
 			}
 			title = text
 		}
 		if description != "" {
-			text, err := http.Translate(description, "et", "en")
+			text, err := Translate(description, "et", "en")
 			if err != nil {
-				l.Logf("FATAL get translate '%s', %v", description, err)
 				taskErrors.With(prometheus.Labels{"error": "get_translate"}).Inc()
+				pushMetrics()
+				l.Logf("FATAL get translate '%s', %v", description, err)
 			}
 			description = text
 		}
@@ -130,7 +119,7 @@ func createNewMessageObject(params *Params, msg *Message) (tgbotapi.Chattable, e
 			DisableWebPagePreview: true,
 		}
 	} else {
-		content, err := http.GetImage(msg.ImageURL)
+		content, err := GetImage(msg.ImageURL)
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +158,7 @@ func createDeleteMessageObject(params *Params, messageID int) *tgbotapi.DeleteMe
 	}
 }
 
-func hasChanges(item *gofeed.Item, entry db.Entry) bool {
+func hasChanges(item *gofeed.Item, entry Entry) bool {
 	if entry.Title != item.Title || entry.Description != item.Description || entry.Link != item.Link {
 		return true
 	}
@@ -178,7 +167,7 @@ func hasChanges(item *gofeed.Item, entry db.Entry) bool {
 
 func addRecord(params *Params) error {
 	var Item = params.Item
-	var entry db.Entry
+	var entry Entry
 	result := params.DB.First(&entry, "guid = ?", Item.GUID)
 	var err error
 	if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -203,7 +192,7 @@ func addRecord(params *Params) error {
 	return nil
 }
 
-func deleteRecord(params *Params, entry db.Entry) error {
+func deleteRecord(params *Params, entry Entry) error {
 	if err := deleteMessage(params, entry); err != nil {
 		if strings.Contains(err.Error(), "message to delete not found") {
 			l.Logf("ERROR delete message '%s', %v", formatGUID(entry.GUID), err)
@@ -213,11 +202,11 @@ func deleteRecord(params *Params, entry db.Entry) error {
 		}
 	}
 	// TODO need to fix it
-	result := params.DB.Unscoped().Where("entry_id = ?", formatGUID(entry.GUID)).Delete(&db.EntryToCategory{})
+	result := params.DB.Unscoped().Where("entry_id = ?", formatGUID(entry.GUID)).Delete(&EntryToCategory{})
 	if result.Error != nil {
 		return result.Error
 	}
-	result = params.DB.Unscoped().Where("guid = ?", formatGUID(entry.GUID)).Delete(&db.Entry{})
+	result = params.DB.Unscoped().Where("guid = ?", formatGUID(entry.GUID)).Delete(&Entry{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -241,14 +230,15 @@ func sendMessage(params *Params, msg tgbotapi.Chattable) error {
 	var Item = params.Item
 	pubDate, err := time.Parse(time.RFC1123Z, Item.Published)
 	if err != nil {
-		l.Logf("FATAL parse date, %v", err)
 		taskErrors.With(prometheus.Labels{"error": "parse_date"}).Inc()
+		pushMetrics()
+		l.Logf("FATAL parse date, %v", err)
 	}
 
-	var entry db.Entry
+	var entry Entry
 	result := params.DB.First(&entry, "guid = ?", Item.GUID)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		entry = db.Entry{
+		entry = Entry{
 			GUID:        Item.GUID,
 			Provider:    params.Provider,
 			Link:        Item.Link,
@@ -261,17 +251,17 @@ func sendMessage(params *Params, msg tgbotapi.Chattable) error {
 		if result.Error != nil {
 			return result.Error
 		}
-		var entryToCategory []db.EntryToCategory
+		var entryToCategory []EntryToCategory
 		for _, categoryName := range Item.Categories {
-			category := db.Category{
+			category := Category{
 				Name:     categoryName,
 				Provider: params.Provider,
 			}
-			result = db.UpsertCategory(params.DB, &category)
+			result = UpsertCategory(params.DB, &category)
 			if result.Error != nil {
 				return result.Error
 			}
-			entryToCategory = append(entryToCategory, db.EntryToCategory{
+			entryToCategory = append(entryToCategory, EntryToCategory{
 				Entry:    entry,
 				Category: category,
 			})
@@ -294,10 +284,11 @@ func sendMessage(params *Params, msg tgbotapi.Chattable) error {
 
 func addMessage(params *Params) error {
 	var Item = params.Item
-	imageURL, err := http.GetImageURL(Item.Link)
+	imageURL, err := GetImageURL(Item.Link)
 	if err != nil {
-		l.Logf("FATAL get image url, %v", err)
 		taskErrors.With(prometheus.Labels{"error": "get_image_url"}).Inc()
+		pushMetrics()
+		l.Logf("FATAL get image url, %v", err)
 	}
 	_, err = url.ParseRequestURI(imageURL)
 	if err != nil {
@@ -314,18 +305,20 @@ func addMessage(params *Params) error {
 		ImageURL:    imageURL,
 	})
 	if err != nil {
-		l.Logf("FATAL get message, %v", err)
 		taskErrors.With(prometheus.Labels{"error": "get_message"}).Inc()
+		pushMetrics()
+		l.Logf("FATAL get message, %v", err)
 	}
 	return sendMessage(params, msg)
 }
 
-func editMessage(params *Params, entry db.Entry) error {
+func editMessage(params *Params, entry Entry) error {
 	var Item = params.Item
-	imageURL, err := http.GetImageURL(Item.Link)
+	imageURL, err := GetImageURL(Item.Link)
 	if err != nil {
-		l.Logf("FATAL get image url, %v", err)
 		taskErrors.With(prometheus.Labels{"error": "get_image_url"}).Inc()
+		pushMetrics()
+		l.Logf("FATAL get image url, %v", err)
 	}
 	msg := createEditMessageObject(params, entry.MessageID, &Message{
 		FeedTitle:   params.Feed.Title,
@@ -337,7 +330,7 @@ func editMessage(params *Params, entry db.Entry) error {
 	return sendMessage(params, msg)
 }
 
-func deleteMessage(params *Params, entry db.Entry) error {
+func deleteMessage(params *Params, entry Entry) error {
 	msg := createDeleteMessageObject(params, entry.MessageID)
 	_, err := params.Bot.Send(msg)
 	if err != nil {
@@ -346,22 +339,24 @@ func deleteMessage(params *Params, entry db.Entry) error {
 	return nil
 }
 
-func getProviders(dbConnect *gorm.DB) []db.Provider {
-	var providers []db.Provider
+func getProviders(dbConnect *gorm.DB) []Provider {
+	var providers []Provider
 	result := dbConnect.Find(&providers)
 	if result.Error != nil {
-		l.Logf("FATAL get providers, %v", result.Error)
 		taskErrors.With(prometheus.Labels{"error": "get_providers"}).Inc()
+		pushMetrics()
+		l.Logf("FATAL get providers, %v", result.Error)
 	}
 	return providers
 }
 
 func deleteDeletedEntries(params *Params, items []*gofeed.Item) error {
-	var entries []db.Entry
+	var entries []Entry
 	result := params.DB.Where(fmt.Sprintf("published > NOW() - INTERVAL '%d hours' AND provider_id = %d", TimeShift, params.Provider.ID)).Find(&entries)
 	if result.Error != nil {
-		l.Logf("FATAL query entries, %v", result.Error)
 		taskErrors.With(prometheus.Labels{"error": "query_entries"}).Inc()
+		pushMetrics()
+		l.Logf("FATAL query entries, %v", result.Error)
 	}
 	items = funk.Filter(items, isValidItemByTerm).([]*gofeed.Item)
 	for _, entry := range entries {
@@ -401,7 +396,7 @@ func isValidItemByTerm(item *gofeed.Item) bool {
 }
 
 func findSimilarRecord(params *Params, item *gofeed.Item) (bool, error) {
-	var entry db.Entry
+	var entry Entry
 	result := params.DB.First(&entry, "updated_at > NOW() - INTERVAL '1 day' AND provider_id != ? AND similarity(?,title) > 0.3", params.Provider.ID, item.Title)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -440,8 +435,8 @@ func cleanUp(dbConnect *gorm.DB) {
 		select {
 		case <-ticker.C:
 			// TODO need to fix it
-			dbConnect.Unscoped().Select("Entry").Where("entries.updated_at < NOW() - INTERVAL '7 days'").Delete(&db.EntryToCategory{})
-			dbConnect.Unscoped().Where("updated_at < NOW() - INTERVAL '7 days'").Delete(&db.Entry{})
+			dbConnect.Unscoped().Select("Entry").Where("entries.updated_at < NOW() - INTERVAL '7 days'").Delete(&EntryToCategory{})
+			dbConnect.Unscoped().Where("updated_at < NOW() - INTERVAL '7 days'").Delete(&Entry{})
 		case <-quit:
 			ticker.Stop()
 			return
@@ -451,11 +446,9 @@ func cleanUp(dbConnect *gorm.DB) {
 
 func main() {
 	_ = godotenv.Load()
-	registry := prometheus.NewRegistry()
-	registry.MustRegister(taskErrors)
-	pusher := push.New("http://s2.lafin.me:9091", "news").Gatherer(registry)
-	dbConnect := db.Connect(os.Getenv("DB_HOST"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"))
-	bot, chatID := tg.Connect(os.Getenv("TELEGRAM_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
+	metrics(os.Getenv("PROMETHEUS_URL"), os.Getenv("PROMETHEUS_JOB"))
+	dbConnect := connectDB(os.Getenv("DB_HOST"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"))
+	bot, chatID := connectTg(os.Getenv("TELEGRAM_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
 	bot.Debug = os.Getenv("DEBUG") == "true"
 	l.Logf("INFO authorized on account '%s'", bot.Self.UserName)
 
@@ -468,9 +461,7 @@ func main() {
 		select {
 		case <-ticker.C:
 			job(dbConnect, bot, chatID)
-			if err := pusher.Push(); err != nil {
-				l.Logf("FATAL could not push to Pushgateway, %v", err)
-			}
+			pushMetrics()
 		case <-quit:
 			ticker.Stop()
 			return
@@ -484,10 +475,11 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 		if provider.Lang != os.Getenv("LANG_NEWS") {
 			continue
 		}
-		feed, err := http.GetFeed(provider.URL)
+		feed, err := GetFeed(provider.URL)
 		if err != nil {
-			l.Logf("FATAL get feed, %v", err)
 			taskErrors.With(prometheus.Labels{"error": "get_feed"}).Inc()
+			pushMetrics()
+			l.Logf("FATAL get feed, %v", err)
 		}
 		params := &Params{
 			Bot:               bot,
@@ -519,12 +511,14 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 			return feed.Items[i].Published > feed.Items[j].Published
 		})
 		if err := deleteDeletedEntries(params, feed.Items); err != nil {
-			l.Logf("FATAL delete record, %v", err)
 			taskErrors.With(prometheus.Labels{"error": "delete_record"}).Inc()
+			pushMetrics()
+			l.Logf("FATAL delete record, %v", err)
 		}
 		if err := addMissingEntries(params, feed.Items); err != nil {
-			l.Logf("FATAL add/edit record, %v", err)
 			taskErrors.With(prometheus.Labels{"error": "add_edit_record"}).Inc()
+			pushMetrics()
+			l.Logf("FATAL add/edit record, %v", err)
 		}
 	}
 }
