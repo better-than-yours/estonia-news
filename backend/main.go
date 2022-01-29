@@ -25,7 +25,7 @@ var TimeoutBetweenLoops = 5 * time.Minute
 var TimeoutBetweenMessages = 1 * time.Second
 
 // TimeShift is time shift
-var TimeShift = 3
+var TimeShift = 1
 
 // Message - config
 type Message struct {
@@ -454,6 +454,7 @@ func main() {
 
 	go cleanUp(dbConnect)
 	job(dbConnect, bot, chatID)
+	pushMetrics()
 
 	ticker := time.NewTicker(TimeoutBetweenLoops)
 	quit := make(chan struct{})
