@@ -12,11 +12,13 @@ require (
 	github.com/lib/pq v1.10.4
 	github.com/mmcdole/gofeed v1.1.3
 	github.com/mmcdole/goxpp v0.0.0-20200921145534-2f3784f67354 // indirect
-	github.com/prometheus/client_golang v1.12.0
+	github.com/prometheus/client_golang v1.12.1
 	github.com/technoweenie/multipartstreamer v1.0.1 // indirect
 	github.com/thoas/go-funk v0.9.1
-	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce // indirect
-	golang.org/x/net v0.0.0-20220121210141-e204ce36a2ba
+	golang.org/x/crypto v0.0.0-20220128200615-198e4374d7ed // indirect
+	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
+	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27 // indirect
+	google.golang.org/protobuf v1.27.1 // indirect
 	gorm.io/driver/postgres v1.2.3
 	gorm.io/gorm v1.22.5
 )
