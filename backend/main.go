@@ -429,7 +429,7 @@ func addMissingEntries(params *Params, items []*gofeed.Item) error {
 }
 
 func cleanUp(dbConnect *gorm.DB) {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(12 * time.Hour)
 	quit := make(chan struct{})
 	for {
 		select {
