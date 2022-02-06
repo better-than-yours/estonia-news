@@ -15,9 +15,9 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/technoweenie/multipartstreamer v1.0.1 // indirect
 	github.com/thoas/go-funk v0.9.1
-	golang.org/x/crypto v0.0.0-20220128200615-198e4374d7ed // indirect
+	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838 // indirect
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
-	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27 // indirect
+	golang.org/x/sys v0.0.0-20220204135822-1c1b9b1eba6a // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 	gorm.io/driver/postgres v1.2.3
 	gorm.io/gorm v1.22.5
