@@ -286,9 +286,10 @@ func addMessage(params *Params) error {
 	var Item = params.Item
 	imageURL, err := GetImageURL(Item.Link)
 	if err != nil {
+		l.Logf("ERROR get image url, %v", err)
 		taskErrors.With(prometheus.Labels{"error": "get_image_url"}).Inc()
 		pushMetrics()
-		l.Logf("FATAL get image url, %v", err)
+		imageURL = ""
 	}
 	_, err = url.ParseRequestURI(imageURL)
 	if err != nil {
@@ -316,9 +317,10 @@ func editMessage(params *Params, entry Entry) error {
 	var Item = params.Item
 	imageURL, err := GetImageURL(Item.Link)
 	if err != nil {
+		l.Logf("ERROR get image url, %v", err)
 		taskErrors.With(prometheus.Labels{"error": "get_image_url"}).Inc()
 		pushMetrics()
-		l.Logf("FATAL get image url, %v", err)
+		imageURL = ""
 	}
 	msg := createEditMessageObject(params, entry.MessageID, &Message{
 		FeedTitle:   params.Feed.Title,
