@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"regexp"
 	"sort"
@@ -26,16 +25,6 @@ var TimeoutBetweenMessages = 1 * time.Second
 
 // TimeShift is time shift
 var TimeShift = 1
-
-// Message - config
-type Message struct {
-	FeedTitle   string
-	Title       string
-	Description string
-	Categories  []string
-	Link        string
-	ImageURL    string
-}
 
 // Params - params
 type Params struct {
@@ -175,6 +164,13 @@ func addRecord(params *Params) error {
 			l.Logf("INFO send edit message '%s'", formatGUID(entry.GUID))
 			err = editMessage(params, entry)
 			if err != nil {
+				if strings.Contains(err.Error(), "message to edit not found") {
+					if err = deleteRecord(params, entry); err != nil {
+						l.Logf("ERROR delete record '%s', %v", formatGUID(entry.GUID), err)
+						taskErrors.With(prometheus.Labels{"error": "delete_record"}).Inc()
+						return err
+					}
+				}
 				return err
 			}
 		}
@@ -193,14 +189,6 @@ func addRecord(params *Params) error {
 }
 
 func deleteRecord(params *Params, entry Entry) error {
-	if err := deleteMessage(params, entry); err != nil {
-		if strings.Contains(err.Error(), "message to delete not found") {
-			l.Logf("ERROR delete message '%s', %v", formatGUID(entry.GUID), err)
-			taskErrors.With(prometheus.Labels{"error": "delete_message"}).Inc()
-		} else {
-			return err
-		}
-	}
 	// TODO need to fix it
 	result := params.DB.Unscoped().Where("entry_id = ?", formatGUID(entry.GUID)).Delete(&EntryToCategory{})
 	if result.Error != nil {
@@ -282,65 +270,6 @@ func sendMessage(params *Params, msg tgbotapi.Chattable) error {
 	return nil
 }
 
-func addMessage(params *Params) error {
-	var Item = params.Item
-	imageURL, err := GetImageURL(Item.Link)
-	if err != nil {
-		l.Logf("ERROR get image url, %v", err)
-		taskErrors.With(prometheus.Labels{"error": "get_image_url"}).Inc()
-		pushMetrics()
-		imageURL = ""
-	}
-	_, err = url.ParseRequestURI(imageURL)
-	if err != nil {
-		l.Logf("ERROR parse image url, %v", err)
-		taskErrors.With(prometheus.Labels{"error": "parse_image_url"}).Inc()
-		imageURL = ""
-	}
-	msg, err := createNewMessageObject(params, &Message{
-		FeedTitle:   params.Feed.Title,
-		Title:       Item.Title,
-		Description: Item.Description,
-		Categories:  Item.Categories,
-		Link:        Item.Link,
-		ImageURL:    imageURL,
-	})
-	if err != nil {
-		taskErrors.With(prometheus.Labels{"error": "get_message"}).Inc()
-		pushMetrics()
-		l.Logf("FATAL get message, %v", err)
-	}
-	return sendMessage(params, msg)
-}
-
-func editMessage(params *Params, entry Entry) error {
-	var Item = params.Item
-	imageURL, err := GetImageURL(Item.Link)
-	if err != nil {
-		l.Logf("ERROR get image url, %v", err)
-		taskErrors.With(prometheus.Labels{"error": "get_image_url"}).Inc()
-		pushMetrics()
-		imageURL = ""
-	}
-	msg := createEditMessageObject(params, entry.MessageID, &Message{
-		FeedTitle:   params.Feed.Title,
-		Title:       Item.Title,
-		Description: Item.Description,
-		Link:        Item.Link,
-		ImageURL:    imageURL,
-	})
-	return sendMessage(params, msg)
-}
-
-func deleteMessage(params *Params, entry Entry) error {
-	msg := createDeleteMessageObject(params, entry.MessageID)
-	_, err := params.Bot.Send(msg)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func getProviders(dbConnect *gorm.DB) []Provider {
 	var providers []Provider
 	result := dbConnect.Find(&providers)
@@ -366,6 +295,14 @@ func deleteDeletedEntries(params *Params, items []*gofeed.Item) error {
 			return formatGUID(entry.GUID) == item.GUID
 		})
 		if !foundEntry {
+			if err := deleteMessage(params, entry); err != nil {
+				if strings.Contains(err.Error(), "message to delete not found") {
+					l.Logf("ERROR delete message '%s', %v", formatGUID(entry.GUID), err)
+					taskErrors.With(prometheus.Labels{"error": "delete_message"}).Inc()
+				} else {
+					return err
+				}
+			}
 			if err := deleteRecord(params, entry); err != nil {
 				l.Logf("ERROR delete record '%s', %v", formatGUID(entry.GUID), err)
 				taskErrors.With(prometheus.Labels{"error": "delete_record"}).Inc()
