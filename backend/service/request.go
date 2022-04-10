@@ -69,12 +69,12 @@ func translate(query, from, to string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	var data []interface{}
+	var data []any
 	if err := json.Unmarshal(body, &data); err != nil {
 		return "", err
 	}
 	if data == nil {
 		return "", errors.New("empty translation")
 	}
-	return data[0].([]interface{})[0].([]interface{})[0].(string), nil
+	return data[0].([]any)[0].([]any)[0].(string), nil
 }

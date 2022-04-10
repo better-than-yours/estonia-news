@@ -6,27 +6,27 @@ import (
 	"estonia-news/entity"
 	"estonia-news/misc"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
+// GetModels return list of models
+func GetModels() []any {
+	return []any{&entity.Provider{}, &entity.Category{}, &entity.Entry{}, &entity.EntryToCategory{}}
+}
+
 // Connect return db connection
-func Connect(dbHost, dbUser, dbPassword, dbName string) *gorm.DB {
+func Connect(host, user, password, name string) *gorm.DB {
 	db, err := gorm.Open(postgres.New(postgres.Config{
-		DSN: fmt.Sprintf("host=%s user=%s password=%s dbname=%s", dbHost, dbUser, dbPassword, dbName),
+		DSN: fmt.Sprintf("host=%s user=%s password=%s dbname=%s", host, user, password, name),
 	}), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
-		misc.TaskErrors.With(prometheus.Labels{"error": "db_connect"}).Inc()
-		misc.PushMetrics()
-		misc.L.Logf("FATAL failed to connect database, %v", err)
+		misc.Fatal("db_connect", "failed to connect database", err)
 	}
-	err = db.AutoMigrate(&entity.Provider{}, &entity.Category{}, &entity.Entry{}, &entity.EntryToCategory{})
+	err = db.AutoMigrate(GetModels()...)
 	if err != nil {
-		misc.TaskErrors.With(prometheus.Labels{"error": "db_migration"}).Inc()
-		misc.PushMetrics()
-		misc.L.Logf("FATAL db migration, %v", err)
+		misc.Fatal("db_migration", "db migration", err)
 	}
 	return db
 }

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -19,27 +18,9 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/joho/godotenv"
 	"github.com/mmcdole/gofeed"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/thoas/go-funk"
 	"gorm.io/gorm"
 )
-
-func formatGUID(path string) string {
-	var r *regexp.Regexp
-	r = regexp.MustCompile(`^\w+#\d+$`)
-	if r.MatchString(path) {
-		return path
-	}
-	r = regexp.MustCompile(`err.*?/(\d+)$`)
-	if r.MatchString(path) {
-		return fmt.Sprintf("err#%s", r.FindStringSubmatch(path)[1])
-	}
-	r = regexp.MustCompile(`delfi.*?/(\d+)/.*?$`)
-	if r.MatchString(path) {
-		return fmt.Sprintf("delfi#%s", r.FindStringSubmatch(path)[1])
-	}
-	return ""
-}
 
 func hasChanges(item *gofeed.Item, entry entity.Entry) bool {
 	if entry.Title != item.Title || entry.Description != item.Description || entry.Link != item.Link {
@@ -54,15 +35,15 @@ func addRecord(params *config.Params) error {
 	result := params.DB.First(&entry, "guid = ?", Item.GUID)
 	if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		if hasChanges(Item, entry) {
-			misc.L.Logf("INFO send edit message '%s'", formatGUID(entry.GUID))
+			misc.L.Logf("INFO send edit message '%s'", misc.FormatGUID(entry.GUID))
 			msg, err := service.Edit(params, entry)
 			if err != nil {
 				if strings.Contains(err.Error(), "message to edit not found") {
-					if err = deleteRecord(params, entry); err != nil {
-						misc.L.Logf("ERROR delete record '%s', %v", formatGUID(entry.GUID), err)
-						misc.TaskErrors.With(prometheus.Labels{"error": "delete_record"}).Inc()
+					if err = service.DeleteRecord(params, entry); err != nil {
+						misc.Error("delete_record", fmt.Sprintf("delete record '%s'", misc.FormatGUID(entry.GUID)), err)
 						return err
 					}
+					time.Sleep(config.TimeoutBetweenMessages)
 				}
 				return err
 			}
@@ -89,29 +70,13 @@ func addRecord(params *config.Params) error {
 	return nil
 }
 
-func deleteRecord(params *config.Params, entry entity.Entry) error {
-	// TODO need to fix it
-	result := params.DB.Unscoped().Where("entry_id = ?", formatGUID(entry.GUID)).Delete(&entity.EntryToCategory{})
-	if result.Error != nil {
-		return result.Error
-	}
-	result = params.DB.Unscoped().Where("guid = ?", formatGUID(entry.GUID)).Delete(&entity.Entry{})
-	if result.Error != nil {
-		return result.Error
-	}
-	time.Sleep(config.TimeoutBetweenMessages)
-	return nil
-}
-
 func sendMessage(params *config.Params, msg tgbotapi.Chattable) error {
 	sendedMsg, err := params.Bot.Send(msg)
 	if err != nil {
 		if strings.Contains(err.Error(), "message is not modified") {
-			misc.L.Logf("ERROR send message, %v", err)
-			misc.TaskErrors.With(prometheus.Labels{"error": "send_message"}).Inc()
+			misc.Error("send_message", "send message", err)
 		} else if strings.Contains(err.Error(), "there is no caption in the message to edit") {
-			misc.L.Logf("ERROR send message, %v", err)
-			misc.TaskErrors.With(prometheus.Labels{"error": "send_message"}).Inc()
+			misc.Error("send_message", "send message", err)
 		} else {
 			return err
 		}
@@ -119,9 +84,7 @@ func sendMessage(params *config.Params, msg tgbotapi.Chattable) error {
 	var Item = params.Item
 	pubDate, err := time.Parse(time.RFC1123Z, Item.Published)
 	if err != nil {
-		misc.TaskErrors.With(prometheus.Labels{"error": "parse_date"}).Inc()
-		misc.PushMetrics()
-		misc.L.Logf("FATAL parse date, %v", err)
+		misc.Fatal("parse_date", "parse date", err)
 	}
 
 	var entry entity.Entry
@@ -175,9 +138,7 @@ func getProviders(dbConnect *gorm.DB) []entity.Provider {
 	var providers []entity.Provider
 	result := dbConnect.Find(&providers)
 	if result.Error != nil {
-		misc.TaskErrors.With(prometheus.Labels{"error": "get_providers"}).Inc()
-		misc.PushMetrics()
-		misc.L.Logf("FATAL get providers, %v", result.Error)
+		misc.Fatal("get_providers", "get providers", result.Error)
 	}
 	return providers
 }
@@ -186,29 +147,26 @@ func deleteDeletedEntries(params *config.Params, items []*gofeed.Item) error {
 	var entries []entity.Entry
 	result := params.DB.Where(fmt.Sprintf("published > NOW() - INTERVAL '%d hours' AND provider_id = %d", config.TimeShift, params.Provider.ID)).Find(&entries)
 	if result.Error != nil {
-		misc.TaskErrors.With(prometheus.Labels{"error": "query_entries"}).Inc()
-		misc.PushMetrics()
-		misc.L.Logf("FATAL query entries, %v", result.Error)
+		misc.Fatal("query_entries", "query entries", result.Error)
 	}
 	items = funk.Filter(items, isValidItemByTerm).([]*gofeed.Item)
 	for _, entry := range entries {
 		foundEntry := funk.Contains(items, func(item *gofeed.Item) bool {
-			return formatGUID(entry.GUID) == item.GUID
+			return misc.FormatGUID(entry.GUID) == item.GUID
 		})
 		if !foundEntry {
 			if err := service.Delete(params, entry); err != nil {
 				if strings.Contains(err.Error(), "message to delete not found") {
-					misc.L.Logf("ERROR delete message '%s', %v", formatGUID(entry.GUID), err)
-					misc.TaskErrors.With(prometheus.Labels{"error": "delete_message"}).Inc()
+					misc.Error("delete_message", fmt.Sprintf("delete message '%s'", misc.FormatGUID(entry.GUID)), err)
 				} else {
 					return err
 				}
 			}
-			if err := deleteRecord(params, entry); err != nil {
-				misc.L.Logf("ERROR delete record '%s', %v", formatGUID(entry.GUID), err)
-				misc.TaskErrors.With(prometheus.Labels{"error": "delete_record"}).Inc()
+			if err := service.DeleteRecord(params, entry); err != nil {
+				misc.Error("delete_record", fmt.Sprintf("delete record '%s'", misc.FormatGUID(entry.GUID)), err)
 				return err
 			}
+			time.Sleep(config.TimeoutBetweenMessages)
 		}
 	}
 	return nil
@@ -251,8 +209,7 @@ func addMissingEntries(params *config.Params, items []*gofeed.Item) error {
 	for _, item := range items {
 		found, err := findSimilarRecord(params, item)
 		if err != nil {
-			misc.L.Logf("ERROR find similar record '%s', %v", item.GUID, err)
-			misc.TaskErrors.With(prometheus.Labels{"error": "find_similar_record"}).Inc()
+			misc.Error("find_similar_record", fmt.Sprintf("find similar record '%s'", misc.FormatGUID(item.GUID)), err)
 			return err
 		}
 		if found {
@@ -260,8 +217,7 @@ func addMissingEntries(params *config.Params, items []*gofeed.Item) error {
 		}
 		params.Item = item
 		if err := addRecord(params); err != nil {
-			misc.L.Logf("ERROR add record '%s', %v", item.GUID, err)
-			misc.TaskErrors.With(prometheus.Labels{"error": "add_record"}).Inc()
+			misc.Error("add_record", fmt.Sprintf("add record '%s'", misc.FormatGUID(item.GUID)), err)
 			return err
 		}
 	}
@@ -318,9 +274,7 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 		}
 		feed, err := service.GetFeed(provider.URL)
 		if err != nil {
-			misc.TaskErrors.With(prometheus.Labels{"error": "get_feed"}).Inc()
-			misc.PushMetrics()
-			misc.L.Logf("FATAL get feed, %v", err)
+			misc.Fatal("get_feed", "get feed", err)
 		}
 		params := &config.Params{
 			Bot:               bot,
@@ -333,11 +287,11 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 		}
 		feed.Items = funk.Map(feed.Items, func(item *gofeed.Item) *gofeed.Item {
 			if len(item.GUID) > 0 {
-				item.GUID = formatGUID(item.GUID)
+				item.GUID = misc.FormatGUID(item.GUID)
 				return item
 			}
 			return &gofeed.Item{
-				GUID:        formatGUID(item.Link),
+				GUID:        misc.FormatGUID(item.Link),
 				Link:        item.Link,
 				Title:       item.Title,
 				Description: item.Description,
@@ -352,14 +306,10 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 			return feed.Items[i].Published > feed.Items[j].Published
 		})
 		if err := deleteDeletedEntries(params, feed.Items); err != nil {
-			misc.TaskErrors.With(prometheus.Labels{"error": "delete_record"}).Inc()
-			misc.PushMetrics()
-			misc.L.Logf("FATAL delete record, %v", err)
+			misc.Fatal("delete_record", "delete record", err)
 		}
 		if err := addMissingEntries(params, feed.Items); err != nil {
-			misc.TaskErrors.With(prometheus.Labels{"error": "add_edit_record"}).Inc()
-			misc.PushMetrics()
-			misc.L.Logf("FATAL add/edit record, %v", err)
+			misc.Fatal("add_edit_record", "add/edit record", err)
 		}
 	}
 }

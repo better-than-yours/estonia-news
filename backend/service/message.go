@@ -11,7 +11,6 @@ import (
 	"estonia-news/misc"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 func renderMessageBlock(msg *Message, title, description string) string {
@@ -34,18 +33,14 @@ func getText(params *config.Params, msg *Message) (title, description string) {
 		if title != "" {
 			text, err := translate(title, "et", "en")
 			if err != nil {
-				misc.TaskErrors.With(prometheus.Labels{"error": "get_translate"}).Inc()
-				misc.PushMetrics()
-				misc.L.Logf("FATAL get translate '%s', %v", title, err)
+				misc.Fatal("get_translate", "get translate", err)
 			}
 			title = text
 		}
 		if description != "" {
 			text, err := translate(description, "et", "en")
 			if err != nil {
-				misc.TaskErrors.With(prometheus.Labels{"error": "get_translate"}).Inc()
-				misc.PushMetrics()
-				misc.L.Logf("FATAL get translate '%s', %v", description, err)
+				misc.Fatal("get_translate", "get translate", err)
 			}
 			description = text
 		}
@@ -120,15 +115,13 @@ func Add(params *config.Params) (tgbotapi.Chattable, error) {
 	var Item = params.Item
 	imageURL, err := getImageURL(Item.Link)
 	if err != nil {
-		misc.L.Logf("ERROR get image url, %v", err)
-		misc.TaskErrors.With(prometheus.Labels{"error": "get_image_url"}).Inc()
+		misc.Error("get_image_url", "get image url", err)
 		misc.PushMetrics()
 		imageURL = ""
 	}
 	_, err = url.ParseRequestURI(imageURL)
 	if err != nil {
-		misc.L.Logf("ERROR parse image url, %v", err)
-		misc.TaskErrors.With(prometheus.Labels{"error": "parse_image_url"}).Inc()
+		misc.Error("parse_image_url", "parse image url", err)
 		imageURL = ""
 	}
 	msg, err := createMessageObject(params, &Message{
@@ -140,9 +133,7 @@ func Add(params *config.Params) (tgbotapi.Chattable, error) {
 		ImageURL:    imageURL,
 	})
 	if err != nil {
-		misc.TaskErrors.With(prometheus.Labels{"error": "get_message"}).Inc()
-		misc.PushMetrics()
-		misc.L.Logf("FATAL get message, %v", err)
+		misc.Fatal("get_message", "get message", err)
 	}
 	return msg, nil
 }
@@ -152,8 +143,7 @@ func Edit(params *config.Params, entry entity.Entry) (*tgbotapi.EditMessageCapti
 	var Item = params.Item
 	imageURL, err := getImageURL(Item.Link)
 	if err != nil {
-		misc.L.Logf("ERROR get image url, %v", err)
-		misc.TaskErrors.With(prometheus.Labels{"error": "get_image_url"}).Inc()
+		misc.Error("get_image_url", "get image url", err)
 		misc.PushMetrics()
 		imageURL = ""
 	}
