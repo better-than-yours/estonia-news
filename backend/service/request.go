@@ -1,4 +1,4 @@
-package main
+package service
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-// GetFeed - get feed
+// GetFeed return feed
 func GetFeed(feedURL string) (*gofeed.Feed, error) {
 	body, _, err := http.Get(feedURL, nil)
 	if err != nil {
@@ -27,8 +27,7 @@ func GetFeed(feedURL string) (*gofeed.Feed, error) {
 	return feed, nil
 }
 
-// GetImage - get a image
-func GetImage(imageURL string) ([]byte, error) {
+func getImage(imageURL string) ([]byte, error) {
 	body, _, err := http.Get(imageURL, nil)
 	if err != nil {
 		return nil, err
@@ -36,8 +35,7 @@ func GetImage(imageURL string) ([]byte, error) {
 	return body, nil
 }
 
-// GetImageURL - get a image url by a link
-func GetImageURL(link string) (string, error) {
+func getImageURL(link string) (string, error) {
 	var imageURL string
 	var findImageURL func(*html.Node)
 	findImageURL = func(node *html.Node) {
@@ -66,8 +64,7 @@ func GetImageURL(link string) (string, error) {
 	return imageURL, nil
 }
 
-// Translate - return translated string
-func Translate(query, from, to string) (string, error) {
+func translate(query, from, to string) (string, error) {
 	body, _, err := http.Get(fmt.Sprintf("https://translate.googleapis.com/translate_a/single?client=gtx&sl=%s&tl=%s&dt=t&q=%s", from, to, url.QueryEscape(query)), nil)
 	if err != nil {
 		return "", err

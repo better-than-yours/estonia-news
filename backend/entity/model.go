@@ -1,34 +1,12 @@
-package main
+package entity
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/lib/pq"
-	"github.com/prometheus/client_golang/prometheus"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"gorm.io/gorm/logger"
 )
-
-func connectDB(dbHost, dbUser, dbPassword, dbName string) *gorm.DB {
-	db, err := gorm.Open(postgres.New(postgres.Config{
-		DSN: fmt.Sprintf("host=%s user=%s password=%s dbname=%s", dbHost, dbUser, dbPassword, dbName),
-	}), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	if err != nil {
-		taskErrors.With(prometheus.Labels{"error": "db_connect"}).Inc()
-		pushMetrics()
-		l.Logf("FATAL failed to connect database, %v", err)
-	}
-	err = db.AutoMigrate(&Provider{}, &Category{}, &Entry{}, &EntryToCategory{})
-	if err != nil {
-		taskErrors.With(prometheus.Labels{"error": "db_migration"}).Inc()
-		pushMetrics()
-		l.Logf("FATAL db migration, %v", err)
-	}
-	return db
-}
 
 // Entry is a entry structure
 type Entry struct {
