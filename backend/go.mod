@@ -1,6 +1,6 @@
 module estonia-news
 
-go 1.17
+go 1.18
 
 require (
 	github.com/go-pkgz/lgr v0.10.4
