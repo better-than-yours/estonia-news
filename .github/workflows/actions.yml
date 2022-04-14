@@ -30,14 +30,19 @@ jobs:
           version: latest
           working-directory: backend
           args: --modules-download-mode=readonly
+      - name: Install dependencies
+        run: |
+          cd ${{ github.workspace }}/backend
+          go mod download
       - name: Test
         run: |
-          cd ${{ github.workspace }}/backend && go test -timeout=60s -covermode=count -coverprofile=${{ github.workspace }}/profile.cov_tmp ./...
-          cat ${{ github.workspace }}/profile.cov_tmp | grep -v "_mock.go" > ${{ github.workspace }}/profile.cov
+          cd ${{ github.workspace }}/backend
+          go test -timeout=60s -race -covermode atomic -coverprofile=covprofile -coverpkg=./... ./tests
       - name: Submit coverage
         run: |
-          GO111MODULE=off go get -u -v github.com/mattn/goveralls
-          $(go env GOPATH)/bin/goveralls -service="github" -coverprofile=${{ github.workspace }}/profile.cov
+          cd ${{ github.workspace }}/backend
+          go install github.com/mattn/goveralls@latest
+          goveralls -coverprofile=covprofile -service=github
         env:
           COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   build:
