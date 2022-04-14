@@ -17,18 +17,20 @@ func renderMessageBlock(msg *Message, title, description string) string {
 	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=%q>%s</a>", title, description, msg.Link, strings.TrimSpace(msg.FeedTitle))
 }
 
-func formatText(text string) string {
-	text = strings.TrimSpace(text)
+// FormatText return formated test
+func FormatText(text string) string {
 	text = regexp.MustCompile(`<img.*?/>`).ReplaceAllString(text, "")
 	text = regexp.MustCompile(`([\x{0020}\x{00a0}\x{1680}\x{180e}\x{2000}-\x{200b}\x{202f}\x{205f}\x{3000}\x{feff}])`).ReplaceAllString(text, " ")
-	text = regexp.MustCompile(`(\s+)`).ReplaceAllString(text, "$1")
-	text = regexp.MustCompile(`(\n)\n+`).ReplaceAllString(text, "$1")
+	text = regexp.MustCompile(`\n+\s+`).ReplaceAllString(text, "\n")
+	text = regexp.MustCompile(`window.addEventListener\(.*?(false|true)\);`).ReplaceAllString(text, "")
+	text = regexp.MustCompile(`(#[\w-]+\s+|\.[\w-]+\s+)+{.*?}`).ReplaceAllString(text, "")
+	text = strings.TrimSpace(text)
 	return text
 }
 
 func getText(params *config.Params, msg *Message) (title, description string) {
-	title = formatText(msg.Title)
-	description = formatText(msg.Description)
+	title = FormatText(msg.Title)
+	description = FormatText(msg.Description)
 	if params.Provider.Lang == "EST" {
 		if title != "" {
 			text, err := translate(title, "et", "en")
