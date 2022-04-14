@@ -14,10 +14,13 @@ import (
 var TimeoutBetweenLoops = 5 * time.Minute
 
 // TimeoutBetweenMessages is timeout between attempts to send a message
-var TimeoutBetweenMessages = 1 * time.Second
+var TimeoutBetweenMessages = time.Second
 
-// TimeShift is time shift
-var TimeShift = 1
+// TimeShift get messages from the last hours
+var TimeShift = time.Hour
+
+// PurgeOldEntriesEvery is time for purge old entries
+var PurgeOldEntriesEvery = time.Hour
 
 // Params is params struct
 type Params struct {

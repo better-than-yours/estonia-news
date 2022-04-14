@@ -145,7 +145,7 @@ func getProviders(dbConnect *gorm.DB) []entity.Provider {
 
 func deleteDeletedEntries(params *config.Params, items []*gofeed.Item) error {
 	var entries []entity.Entry
-	result := params.DB.Where(fmt.Sprintf("published > NOW() - INTERVAL '%d hours' AND provider_id = %d", config.TimeShift, params.Provider.ID)).Find(&entries)
+	result := params.DB.Where(fmt.Sprintf("published > NOW() - INTERVAL '%d hours' AND provider_id = %d", config.TimeShift/time.Hour, params.Provider.ID)).Find(&entries)
 	if result.Error != nil {
 		misc.Fatal("query_entries", "query entries", result.Error)
 	}
@@ -190,7 +190,7 @@ func isValidItemByContent(params *config.Params, item *gofeed.Item) bool {
 
 func isValidItemByTerm(item *gofeed.Item) bool {
 	pubDate, _ := time.Parse(time.RFC1123Z, item.Published)
-	return !pubDate.Add(time.Duration(config.TimeShift) * time.Hour).Before(time.Now())
+	return !pubDate.Add(config.TimeShift).Before(time.Now())
 }
 
 func findSimilarRecord(params *config.Params, item *gofeed.Item) (bool, error) {
@@ -225,7 +225,7 @@ func addMissingEntries(params *config.Params, items []*gofeed.Item) error {
 }
 
 func cleanUp(dbConnect *gorm.DB) {
-	ticker := time.NewTicker(12 * time.Hour)
+	ticker := time.NewTicker(config.PurgeOldEntriesEvery)
 	quit := make(chan struct{})
 	for {
 		select {
