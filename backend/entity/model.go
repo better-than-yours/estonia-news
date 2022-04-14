@@ -15,11 +15,11 @@ type Entry struct {
 	Title       string
 	Description string
 	MessageID   int
-	Categories  []EntryToCategory
-	ProviderID  int       `gorm:"index:provider_id_index;index:provider_id_published_index;index:provider_id_updated_at_index"`
-	Provider    Provider  `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	UpdatedAt   time.Time `gorm:"index:updated_at_index;index:provider_id_updated_at_index"`
-	Published   time.Time `gorm:"index:published_index;index:provider_id_published_index"`
+	Categories  []EntryToCategory `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	ProviderID  int               `gorm:"index:provider_id_index;index:provider_id_published_index;index:provider_id_updated_at_index"`
+	Provider    Provider          `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	UpdatedAt   time.Time         `gorm:"index:updated_at_index;index:provider_id_updated_at_index"`
+	Published   time.Time         `gorm:"index:published_index;index:provider_id_published_index"`
 }
 
 // Provider is a provider structure

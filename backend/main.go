@@ -230,8 +230,6 @@ func cleanUp(dbConnect *gorm.DB) {
 	for {
 		select {
 		case <-ticker.C:
-			// TODO need to fix it
-			dbConnect.Unscoped().Select("Entry").Where("entries.updated_at < NOW() - INTERVAL '7 days'").Delete(&entity.EntryToCategory{})
 			dbConnect.Unscoped().Where("updated_at < NOW() - INTERVAL '7 days'").Delete(&entity.Entry{})
 		case <-quit:
 			ticker.Stop()
