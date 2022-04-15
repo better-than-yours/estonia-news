@@ -23,15 +23,15 @@ func (t *SuiteTest) Test_Record_DeleteRecord() {
 	if assert.NoError(t.T(), err) {
 		var entries []entity.Entry
 		result1 := t.db.Find(&entries)
-		assert.EqualValues(t.T(), result1.RowsAffected, 1)
+		assert.EqualValues(t.T(), 1, result1.RowsAffected)
 		assert.NoError(t.T(), result1.Error)
-		assert.Equal(t.T(), entries[0].GUID, "err#321")
+		assert.Equal(t.T(), "err#321", entries[0].GUID)
 
 		var entriesToCategories []entity.EntryToCategory
 		result2 := t.db.Find(&entriesToCategories)
-		assert.EqualValues(t.T(), result2.RowsAffected, 1)
+		assert.EqualValues(t.T(), 1, result2.RowsAffected)
 		assert.NoError(t.T(), result2.Error)
-		assert.Equal(t.T(), entriesToCategories[0].EntryID, "err#321")
+		assert.Equal(t.T(), "err#321", entriesToCategories[0].EntryID)
 	}
 }
 
@@ -54,23 +54,23 @@ func (t *SuiteTest) Test_Record_UpsertRecord_Create() {
 	if assert.NoError(t.T(), err) {
 		var entries []entity.Entry
 		result1 := t.db.Find(&entries)
-		assert.EqualValues(t.T(), result1.RowsAffected, 1)
+		assert.EqualValues(t.T(), 1, result1.RowsAffected)
 		assert.NoError(t.T(), result1.Error)
-		assert.Equal(t.T(), entries[0].GUID, "err#123")
+		assert.Equal(t.T(), "err#123", entries[0].GUID)
 
 		var categories []entity.Category
 		result2 := t.db.Find(&categories)
-		assert.EqualValues(t.T(), result2.RowsAffected, 2)
+		assert.EqualValues(t.T(), 2, result2.RowsAffected)
 		assert.NoError(t.T(), result2.Error)
-		assert.Equal(t.T(), categories[0].Name, "cat1")
-		assert.Equal(t.T(), categories[1].Name, "cat3")
+		assert.Equal(t.T(), "cat1", categories[0].Name)
+		assert.Equal(t.T(), "cat3", categories[1].Name)
 
 		var entriesToCategories []entity.EntryToCategory
 		result3 := t.db.Find(&entriesToCategories)
-		assert.EqualValues(t.T(), result3.RowsAffected, 2)
+		assert.EqualValues(t.T(), 2, result3.RowsAffected)
 		assert.NoError(t.T(), result3.Error)
-		assert.Equal(t.T(), entriesToCategories[0].EntryID, "err#123")
-		assert.Equal(t.T(), entriesToCategories[1].EntryID, "err#123")
+		assert.Equal(t.T(), "err#123", entriesToCategories[0].EntryID)
+		assert.Equal(t.T(), "err#123", entriesToCategories[1].EntryID)
 	}
 }
 
@@ -95,31 +95,32 @@ func (t *SuiteTest) Test_Record_UpsertRecord_Update() {
 		DB:       t.db,
 		Provider: provider,
 		Item: &gofeed.Item{
-			GUID: "err#123",
-			Link: "link_new",
+			GUID:  "err#123",
+			Link:  "link_new",
+			Title: "title",
 		},
 	}, 123)
 	if assert.NoError(t.T(), err) {
 		var entries []entity.Entry
 		result1 := t.db.Find(&entries)
-		assert.EqualValues(t.T(), result1.RowsAffected, 1)
+		assert.EqualValues(t.T(), 1, result1.RowsAffected)
 		assert.NoError(t.T(), result1.Error)
-		assert.Equal(t.T(), entries[0].GUID, "err#123")
-		assert.Equal(t.T(), entries[0].Link, "link_new")
-		assert.Equal(t.T(), entries[0].Title, "title")
+		assert.Equal(t.T(), "err#123", entries[0].GUID)
+		assert.Equal(t.T(), "link_new", entries[0].Link)
+		assert.Equal(t.T(), "title", entries[0].Title)
 
 		var categories []entity.Category
 		result2 := t.db.Find(&categories)
-		assert.EqualValues(t.T(), result2.RowsAffected, 2)
+		assert.EqualValues(t.T(), 2, result2.RowsAffected)
 		assert.NoError(t.T(), result2.Error)
-		assert.Equal(t.T(), categories[0].Name, "cat1")
-		assert.Equal(t.T(), categories[1].Name, "cat3")
+		assert.Equal(t.T(), "cat1", categories[0].Name)
+		assert.Equal(t.T(), "cat3", categories[1].Name)
 
 		var entriesToCategories []entity.EntryToCategory
 		result3 := t.db.Find(&entriesToCategories)
-		assert.EqualValues(t.T(), result3.RowsAffected, 2)
+		assert.EqualValues(t.T(), 2, result3.RowsAffected)
 		assert.NoError(t.T(), result3.Error)
-		assert.Equal(t.T(), entriesToCategories[0].EntryID, "err#123")
-		assert.Equal(t.T(), entriesToCategories[1].EntryID, "err#123")
+		assert.Equal(t.T(), "err#123", entriesToCategories[0].EntryID)
+		assert.Equal(t.T(), "err#123", entriesToCategories[1].EntryID)
 	}
 }

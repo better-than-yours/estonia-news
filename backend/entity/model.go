@@ -47,11 +47,26 @@ type EntryToCategory struct {
 	Category   Category `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
+// UpsertEntry is function for upsert entry
+func UpsertEntry(db *gorm.DB, item *Entry) *gorm.DB {
+	return db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "guid"}},
+		UpdateAll: true,
+	}).Create(item)
+}
+
 // UpsertCategory is function for upsert category
 func UpsertCategory(db *gorm.DB, item *Category) *gorm.DB {
 	return db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "name"}, {Name: "provider_id"}},
-		UpdateAll: true,
+		DoNothing: true,
 	}).Create(item)
+}
 
+// UpsertEntryToCategory is function for upsert entryToCategory
+func UpsertEntryToCategory(db *gorm.DB, item *EntryToCategory) *gorm.DB {
+	return db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "entry_id"}, {Name: "category_id"}},
+		DoNothing: true,
+	}).Create(item)
 }
