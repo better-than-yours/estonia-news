@@ -81,57 +81,7 @@ func sendMessage(params *config.Params, msg tgbotapi.Chattable) error {
 			return err
 		}
 	}
-	var Item = params.Item
-	pubDate, err := time.Parse(time.RFC1123Z, Item.Published)
-	if err != nil {
-		misc.Fatal("parse_date", "parse date", err)
-	}
-
-	var entry entity.Entry
-	result := params.DB.First(&entry, "guid = ?", Item.GUID)
-	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		entry = entity.Entry{
-			GUID:        Item.GUID,
-			Provider:    params.Provider,
-			Link:        Item.Link,
-			Title:       Item.Title,
-			Description: Item.Description,
-			Published:   pubDate,
-			MessageID:   sendedMsg.MessageID,
-		}
-		result = params.DB.Create(&entry)
-		if result.Error != nil {
-			return result.Error
-		}
-		var entryToCategory []entity.EntryToCategory
-		for _, categoryName := range Item.Categories {
-			category := entity.Category{
-				Name:     categoryName,
-				Provider: params.Provider,
-			}
-			result = entity.UpsertCategory(params.DB, &category)
-			if result.Error != nil {
-				return result.Error
-			}
-			entryToCategory = append(entryToCategory, entity.EntryToCategory{
-				Entry:    entry,
-				Category: category,
-			})
-		}
-		result = params.DB.Create(&entryToCategory)
-		if result.Error != nil {
-			return result.Error
-		}
-	} else {
-		entry.Title = Item.Title
-		entry.Description = Item.Description
-		entry.Link = Item.Link
-		result = params.DB.Where("guid = ?", Item.GUID).Updates(&entry)
-		if result.Error != nil {
-			return result.Error
-		}
-	}
-	return nil
+	return service.UpsertRecord(params, sendedMsg.MessageID)
 }
 
 func getProviders(dbConnect *gorm.DB) []entity.Provider {

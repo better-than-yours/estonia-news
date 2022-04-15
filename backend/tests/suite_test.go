@@ -30,6 +30,14 @@ func (t *SuiteTest) TearDownSuite() {
 	}
 }
 
-func (t *SuiteTest) SetupTest() {}
+func (t *SuiteTest) SetupTest() {
+	for _, val := range db.GetModels() {
+		t.db.Migrator().AutoMigrate(val)
+	}
+}
 
-func (t *SuiteTest) TearDownTest() {}
+func (t *SuiteTest) TearDownTest() {
+	for _, val := range db.GetModels() {
+		t.db.Migrator().DropTable(val)
+	}
+}

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func (t *SuiteTest) TestMessage() {
+func (t *SuiteTest) Test_Message_FormatText() {
 	message1 := `Ööl vastu 24.window.addEventListener("message", function msg(event) {if (event.data != "" && event.data.indexOf("px") > -1) {var height = event.data.split(":"); var iframe = document.getElementById(height[0]);if(iframe){iframe.style.height = height[1]; iframe.style.width = "100%"; iframe.style.border = 0; iframe.style.overflow = "hidden"; iframe.parentElement.parentElement.style.maxWidth = "100%";}}}, false);
 	#bookmark { border: 0; overflow: hidden;} .device-desktop .superarticle #bookmark { padding-left: 30px !important; max-width: 750px !important;}
 
