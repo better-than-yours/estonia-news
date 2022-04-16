@@ -35,12 +35,12 @@ func addRecord(params *config.Params) error {
 	result := params.DB.First(&entry, "guid = ?", Item.GUID)
 	if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		if hasChanges(Item, entry) {
-			misc.L.Logf("INFO send edit message '%s'", misc.FormatGUID(entry.GUID))
+			misc.L.Logf("INFO send edit message '%s'", entry.GUID)
 			msg, err := service.Edit(params, entry)
 			if err != nil {
 				if strings.Contains(err.Error(), "message to edit not found") {
 					if err = service.DeleteRecord(params, entry); err != nil {
-						misc.Error("delete_record", fmt.Sprintf("delete record '%s'", misc.FormatGUID(entry.GUID)), err)
+						misc.Error("delete_record", fmt.Sprintf("delete record '%s'", entry.GUID), err)
 						return err
 					}
 					time.Sleep(config.TimeoutBetweenMessages)
@@ -102,18 +102,18 @@ func deleteDeletedEntries(params *config.Params, items []*gofeed.Item) error {
 	items = funk.Filter(items, isValidItemByTerm).([]*gofeed.Item)
 	for _, entry := range entries {
 		foundEntry := funk.Contains(items, func(item *gofeed.Item) bool {
-			return misc.FormatGUID(entry.GUID) == item.GUID
+			return entry.GUID == item.GUID
 		})
 		if !foundEntry {
 			if err := service.Delete(params, entry); err != nil {
 				if strings.Contains(err.Error(), "message to delete not found") {
-					misc.Error("delete_message", fmt.Sprintf("delete message '%s'", misc.FormatGUID(entry.GUID)), err)
+					misc.Error("delete_message", fmt.Sprintf("delete message '%s'", entry.GUID), err)
 				} else {
 					return err
 				}
 			}
 			if err := service.DeleteRecord(params, entry); err != nil {
-				misc.Error("delete_record", fmt.Sprintf("delete record '%s'", misc.FormatGUID(entry.GUID)), err)
+				misc.Error("delete_record", fmt.Sprintf("delete record '%s'", entry.GUID), err)
 				return err
 			}
 			time.Sleep(config.TimeoutBetweenMessages)
@@ -159,7 +159,7 @@ func addMissingEntries(params *config.Params, items []*gofeed.Item) error {
 	for _, item := range items {
 		found, err := findSimilarRecord(params, item)
 		if err != nil {
-			misc.Error("find_similar_record", fmt.Sprintf("find similar record '%s'", misc.FormatGUID(item.GUID)), err)
+			misc.Error("find_similar_record", fmt.Sprintf("find similar record '%s'", item.GUID), err)
 			return err
 		}
 		if found {
@@ -167,7 +167,7 @@ func addMissingEntries(params *config.Params, items []*gofeed.Item) error {
 		}
 		params.Item = item
 		if err := addRecord(params); err != nil {
-			misc.Error("add_record", fmt.Sprintf("add record '%s'", misc.FormatGUID(item.GUID)), err)
+			misc.Error("add_record", fmt.Sprintf("add record '%s'", item.GUID), err)
 			return err
 		}
 	}
