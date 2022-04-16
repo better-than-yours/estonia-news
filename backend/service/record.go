@@ -37,19 +37,24 @@ func UpsertRecord(params *config.Params, messageID int) error {
 	if result.Error != nil {
 		return result.Error
 	}
+	result = params.DB.Unscoped().Where("entry_id = ?", item.GUID).Delete(&entity.EntryToCategory{})
+	if result.Error != nil {
+		return result.Error
+	}
 	for _, categoryName := range item.Categories {
 		category := entity.Category{
 			Name:     categoryName,
 			Provider: params.Provider,
 		}
-		result = entity.UpsertCategory(params.DB, &category)
+		result = params.DB.Where(category).FirstOrCreate(&category)
 		if result.Error != nil {
 			return result.Error
 		}
-		result = entity.UpsertEntryToCategory(params.DB, &entity.EntryToCategory{
-			Entry:    entry,
-			Category: category,
-		})
+		entryToCategory := entity.EntryToCategory{
+			EntryID:    entry.GUID,
+			CategoryID: category.ID,
+		}
+		result = params.DB.Where(entryToCategory).FirstOrCreate(&entryToCategory)
 		if result.Error != nil {
 			return result.Error
 		}
