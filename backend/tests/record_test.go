@@ -42,7 +42,7 @@ func (t *SuiteTest) Test_Record_UpsertRecord_Create() {
 	err := service.UpsertRecord(&config.Params{
 		DB:       t.db,
 		Provider: provider,
-		Item: &gofeed.Item{
+		Item: &config.FeedItem{
 			GUID:        "err#123",
 			Published:   "Mon, 02 Jan 2006 15:04:05 -0700",
 			Link:        "link",
@@ -81,7 +81,7 @@ func (t *SuiteTest) Test_Record_UpsertRecord_Update() {
 	err := service.UpsertRecord(&config.Params{
 		DB:       t.db,
 		Provider: provider,
-		Item: &gofeed.Item{
+		Item: &config.FeedItem{
 			GUID:        "err#123",
 			Published:   "Mon, 02 Jan 2006 15:04:05 -0700",
 			Link:        "link",
@@ -94,7 +94,7 @@ func (t *SuiteTest) Test_Record_UpsertRecord_Update() {
 	err = service.UpsertRecord(&config.Params{
 		DB:       t.db,
 		Provider: provider,
-		Item: &gofeed.Item{
+		Item: &config.FeedItem{
 			GUID:       "err#123",
 			Link:       "link_new",
 			Title:      "title",
@@ -126,5 +126,31 @@ func (t *SuiteTest) Test_Record_UpsertRecord_Update() {
 		assert.Equal(t.T(), "err#123", entryToCategories[1].EntryID)
 		assert.Equal(t.T(), 1, entryToCategories[0].CategoryID)
 		assert.Equal(t.T(), 3, entryToCategories[1].CategoryID)
+	}
+}
+
+func (t *SuiteTest) Test_Record_AddMissedCategories() {
+	provider := entity.Provider{URL: "err.ee"}
+	t.db.Create(&provider)
+
+	categoriesMap, err := service.AddMissedCategories(&config.Params{
+		DB:       t.db,
+		Provider: provider,
+	}, []*gofeed.Item{{
+		Categories: []string{"cat1", "cat2"},
+	}, {
+		Categories: []string{"cat1", "cat3"},
+	}})
+	if assert.NoError(t.T(), err) {
+		var categories []entity.Category
+		result2 := t.db.Find(&categories)
+		assert.EqualValues(t.T(), 3, result2.RowsAffected)
+		assert.NoError(t.T(), result2.Error)
+		assert.Equal(t.T(), "cat1", categories[0].Name)
+		assert.Equal(t.T(), "cat2", categories[1].Name)
+		assert.Equal(t.T(), "cat3", categories[2].Name)
+		assert.Equal(t.T(), 1, categoriesMap["cat1"])
+		assert.Equal(t.T(), 2, categoriesMap["cat2"])
+		assert.Equal(t.T(), 3, categoriesMap["cat3"])
 	}
 }

@@ -22,7 +22,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func hasChanges(item *gofeed.Item, entry entity.Entry) bool {
+func hasChanges(item *config.FeedItem, entry entity.Entry) bool {
 	if entry.Title != item.Title || entry.Description != item.Description || entry.Link != item.Link {
 		return true
 	}
@@ -93,15 +93,15 @@ func getProviders(dbConnect *gorm.DB) []entity.Provider {
 	return providers
 }
 
-func deleteDeletedEntries(params *config.Params, items []*gofeed.Item) error {
+func deleteDeletedEntries(params *config.Params, items []*config.FeedItem) error {
 	var entries []entity.Entry
 	result := params.DB.Where(fmt.Sprintf("published > NOW() - INTERVAL '%d hours' AND provider_id = %d", config.TimeShift/time.Hour, params.Provider.ID)).Find(&entries)
 	if result.Error != nil {
 		misc.Fatal("query_entries", "query entries", result.Error)
 	}
-	items = funk.Filter(items, isValidItemByTerm).([]*gofeed.Item)
+	items = funk.Filter(items, isValidItemByTerm).([]*config.FeedItem)
 	for _, entry := range entries {
-		foundEntry := funk.Contains(items, func(item *gofeed.Item) bool {
+		foundEntry := funk.Contains(items, func(item *config.FeedItem) bool {
 			return entry.GUID == item.GUID
 		})
 		if !foundEntry {
@@ -122,7 +122,7 @@ func deleteDeletedEntries(params *config.Params, items []*gofeed.Item) error {
 	return nil
 }
 
-func isValidItemByContent(params *config.Params, item *gofeed.Item) bool {
+func isValidItemByContent(params *config.Params, item *config.FeedItem) bool {
 	if len(funk.IntersectString(params.BlockedCategories, item.Categories)) > 0 {
 		return false
 	}
@@ -138,12 +138,12 @@ func isValidItemByContent(params *config.Params, item *gofeed.Item) bool {
 	return true
 }
 
-func isValidItemByTerm(item *gofeed.Item) bool {
+func isValidItemByTerm(item *config.FeedItem) bool {
 	pubDate, _ := time.Parse(time.RFC1123Z, item.Published)
 	return !pubDate.Add(config.TimeShift).Before(time.Now())
 }
 
-func findSimilarRecord(params *config.Params, item *gofeed.Item) (bool, error) {
+func findSimilarRecord(params *config.Params, item *config.FeedItem) (bool, error) {
 	var entry entity.Entry
 	result := params.DB.First(&entry, "updated_at > NOW() - INTERVAL '1 day' AND provider_id != ? AND similarity(?,title) > 0.3", params.Provider.ID, item.Title)
 	if result.Error != nil {
@@ -155,7 +155,7 @@ func findSimilarRecord(params *config.Params, item *gofeed.Item) (bool, error) {
 	return true, nil
 }
 
-func addMissingEntries(params *config.Params, items []*gofeed.Item) error {
+func addMissingEntries(params *config.Params, items []*config.FeedItem) error {
 	for _, item := range items {
 		found, err := findSimilarRecord(params, item)
 		if err != nil {
@@ -233,30 +233,40 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 			BlockedCategories: provider.BlockedCategories,
 			BlockedWords:      provider.BlockedWords,
 		}
-		feed.Items = funk.Map(feed.Items, func(item *gofeed.Item) *gofeed.Item {
+		categoriesMap, err := service.AddMissedCategories(params, feed.Items)
+		if err != nil {
+			misc.Fatal("add_missed_categories", "add missed categories", err)
+		}
+		items := funk.Map(feed.Items, func(item *gofeed.Item) *config.FeedItem {
+			var guid string
 			if len(item.GUID) > 0 {
-				item.GUID = misc.FormatGUID(item.GUID)
-				return item
+				guid = misc.FormatGUID(item.GUID)
+			} else {
+				guid = misc.FormatGUID(item.Link)
 			}
-			return &gofeed.Item{
-				GUID:        misc.FormatGUID(item.Link),
-				Link:        item.Link,
-				Title:       item.Title,
-				Description: item.Description,
-				Categories:  item.Categories,
-				Published:   item.Published,
+			categoriesIds := funk.Map(item.Categories, func(category string) int {
+				return categoriesMap[category]
+			}).([]int)
+			return &config.FeedItem{
+				GUID:          guid,
+				Link:          item.Link,
+				Title:         item.Title,
+				Description:   item.Description,
+				Categories:    item.Categories,
+				Published:     item.Published,
+				CategoriesIds: categoriesIds,
 			}
-		}).([]*gofeed.Item)
-		feed.Items = funk.Filter(feed.Items, func(item *gofeed.Item) bool {
+		}).([]*config.FeedItem)
+		items = funk.Filter(items, func(item *config.FeedItem) bool {
 			return isValidItemByContent(params, item)
-		}).([]*gofeed.Item)
-		sort.Slice(feed.Items, func(i, j int) bool {
-			return feed.Items[i].Published > feed.Items[j].Published
+		}).([]*config.FeedItem)
+		sort.Slice(items, func(i, j int) bool {
+			return items[i].Published > items[j].Published
 		})
-		if err := deleteDeletedEntries(params, feed.Items); err != nil {
+		if err := deleteDeletedEntries(params, items); err != nil {
 			misc.Fatal("delete_record", "delete record", err)
 		}
-		if err := addMissingEntries(params, feed.Items); err != nil {
+		if err := addMissingEntries(params, items); err != nil {
 			misc.Fatal("add_edit_record", "add/edit record", err)
 		}
 	}

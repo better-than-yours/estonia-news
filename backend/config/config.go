@@ -27,10 +27,21 @@ type Params struct {
 	Bot               *tgbotapi.BotAPI
 	DB                *gorm.DB
 	Feed              *gofeed.Feed
-	Item              *gofeed.Item
+	Item              *FeedItem
 	Provider          entity.Provider
 	ChatID            int64
 	Lang              string
 	BlockedCategories []string
 	BlockedWords      []string
+}
+
+// FeedItem is feed item struct
+type FeedItem struct {
+	GUID          string
+	Link          string
+	Title         string
+	Description   string
+	Published     string
+	Categories    []string
+	CategoriesIds []int
 }
