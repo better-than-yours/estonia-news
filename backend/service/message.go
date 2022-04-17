@@ -113,9 +113,8 @@ type Message struct {
 }
 
 // Add is add message
-func Add(params *config.Params) (tgbotapi.Chattable, error) {
-	var Item = params.Item
-	imageURL, err := getImageURL(Item.Link)
+func Add(params *config.Params, item *config.FeedItem) (tgbotapi.Chattable, error) {
+	imageURL, err := getImageURL(item.Link)
 	if err != nil {
 		misc.Error("get_image_url", "get image url", err)
 		misc.PushMetrics()
@@ -128,10 +127,10 @@ func Add(params *config.Params) (tgbotapi.Chattable, error) {
 	}
 	msg, err := createMessageObject(params, &Message{
 		FeedTitle:   params.Feed.Title,
-		Title:       Item.Title,
-		Description: Item.Description,
-		Categories:  Item.Categories,
-		Link:        Item.Link,
+		Title:       item.Title,
+		Description: item.Description,
+		Categories:  item.Categories,
+		Link:        item.Link,
 		ImageURL:    imageURL,
 	})
 	if err != nil {
@@ -141,9 +140,8 @@ func Add(params *config.Params) (tgbotapi.Chattable, error) {
 }
 
 // Edit is edit message
-func Edit(params *config.Params, entry entity.Entry) (*tgbotapi.EditMessageCaptionConfig, error) {
-	var Item = params.Item
-	imageURL, err := getImageURL(Item.Link)
+func Edit(params *config.Params, item *config.FeedItem, entry entity.Entry) (*tgbotapi.EditMessageCaptionConfig, error) {
+	imageURL, err := getImageURL(item.Link)
 	if err != nil {
 		misc.Error("get_image_url", "get image url", err)
 		misc.PushMetrics()
@@ -151,9 +149,9 @@ func Edit(params *config.Params, entry entity.Entry) (*tgbotapi.EditMessageCapti
 	}
 	msg := editMessageObject(params, entry.MessageID, &Message{
 		FeedTitle:   params.Feed.Title,
-		Title:       Item.Title,
-		Description: Item.Description,
-		Link:        Item.Link,
+		Title:       item.Title,
+		Description: item.Description,
+		Link:        item.Link,
 		ImageURL:    imageURL,
 	})
 	return msg, nil

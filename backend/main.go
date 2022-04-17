@@ -29,14 +29,13 @@ func hasChanges(item *config.FeedItem, entry entity.Entry) bool {
 	return false
 }
 
-func addRecord(params *config.Params) error {
-	var Item = params.Item
+func addRecord(params *config.Params, item *config.FeedItem) error {
 	var entry entity.Entry
-	result := params.DB.First(&entry, "guid = ?", Item.GUID)
+	result := params.DB.First(&entry, "guid = ?", item.GUID)
 	if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		if hasChanges(Item, entry) {
+		if hasChanges(item, entry) {
 			misc.L.Logf("INFO send edit message '%s'", entry.GUID)
-			msg, err := service.Edit(params, entry)
+			msg, err := service.Edit(params, item, entry)
 			if err != nil {
 				if strings.Contains(err.Error(), "message to edit not found") {
 					if err = service.DeleteRecord(params, entry); err != nil {
@@ -47,22 +46,30 @@ func addRecord(params *config.Params) error {
 				}
 				return err
 			}
-			err = sendMessage(params, msg)
+			sendedMsg, err := sendMessage(params, msg)
+			if err != nil {
+				return err
+			}
+			err = service.UpsertRecord(params, item, sendedMsg.MessageID)
 			if err != nil {
 				return err
 			}
 		}
 		return nil
 	}
-	if !isValidItemByTerm(Item) {
+	if !isValidItemByTerm(item) {
 		return nil
 	}
-	misc.L.Logf("INFO send message '%s'", Item.GUID)
-	msg, err := service.Add(params)
+	misc.L.Logf("INFO send message '%s'", item.GUID)
+	msg, err := service.Add(params, item)
 	if err != nil {
 		return err
 	}
-	err = sendMessage(params, msg)
+	sendedMsg, err := sendMessage(params, msg)
+	if err != nil {
+		return err
+	}
+	err = service.UpsertRecord(params, item, sendedMsg.MessageID)
 	if err != nil {
 		return err
 	}
@@ -70,18 +77,17 @@ func addRecord(params *config.Params) error {
 	return nil
 }
 
-func sendMessage(params *config.Params, msg tgbotapi.Chattable) error {
+func sendMessage(params *config.Params, msg tgbotapi.Chattable) (*tgbotapi.Message, error) {
 	sendedMsg, err := params.Bot.Send(msg)
 	if err != nil {
 		if strings.Contains(err.Error(), "message is not modified") {
 			misc.Error("send_message", "send message", err)
 		} else if strings.Contains(err.Error(), "there is no caption in the message to edit") {
 			misc.Error("send_message", "send message", err)
-		} else {
-			return err
 		}
+		return nil, err
 	}
-	return service.UpsertRecord(params, sendedMsg.MessageID)
+	return &sendedMsg, nil
 }
 
 func getProviders(dbConnect *gorm.DB) []entity.Provider {
@@ -165,8 +171,7 @@ func addMissingEntries(params *config.Params, items []*config.FeedItem) error {
 		if found {
 			continue
 		}
-		params.Item = item
-		if err := addRecord(params); err != nil {
+		if err := addRecord(params, item); err != nil {
 			misc.Error("add_record", fmt.Sprintf("add record '%s'", item.GUID), err)
 			return err
 		}

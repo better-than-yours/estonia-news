@@ -27,7 +27,6 @@ type Params struct {
 	Bot               *tgbotapi.BotAPI
 	DB                *gorm.DB
 	Feed              *gofeed.Feed
-	Item              *FeedItem
 	Provider          entity.Provider
 	ChatID            int64
 	Lang              string

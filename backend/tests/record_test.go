@@ -42,14 +42,13 @@ func (t *SuiteTest) Test_Record_UpsertRecord_Create() {
 	err := service.UpsertRecord(&config.Params{
 		DB:       t.db,
 		Provider: provider,
-		Item: &config.FeedItem{
-			GUID:        "err#123",
-			Published:   "Mon, 02 Jan 2006 15:04:05 -0700",
-			Link:        "link",
-			Title:       "title",
-			Description: "description",
-			Categories:  []string{"cat1", "cat3"},
-		},
+	}, &config.FeedItem{
+		GUID:        "err#123",
+		Published:   "Mon, 02 Jan 2006 15:04:05 -0700",
+		Link:        "link",
+		Title:       "title",
+		Description: "description",
+		Categories:  []string{"cat1", "cat3"},
 	}, 123)
 	if assert.NoError(t.T(), err) {
 		var entries []entity.Entry
@@ -81,25 +80,23 @@ func (t *SuiteTest) Test_Record_UpsertRecord_Update() {
 	err := service.UpsertRecord(&config.Params{
 		DB:       t.db,
 		Provider: provider,
-		Item: &config.FeedItem{
-			GUID:        "err#123",
-			Published:   "Mon, 02 Jan 2006 15:04:05 -0700",
-			Link:        "link",
-			Title:       "title",
-			Description: "description",
-			Categories:  []string{"cat1", "cat3"},
-		},
+	}, &config.FeedItem{
+		GUID:        "err#123",
+		Published:   "Mon, 02 Jan 2006 15:04:05 -0700",
+		Link:        "link",
+		Title:       "title",
+		Description: "description",
+		Categories:  []string{"cat1", "cat3"},
 	}, 123)
 	assert.NoError(t.T(), err)
 	err = service.UpsertRecord(&config.Params{
 		DB:       t.db,
 		Provider: provider,
-		Item: &config.FeedItem{
-			GUID:       "err#123",
-			Link:       "link_new",
-			Title:      "title",
-			Categories: []string{"cat1", "cat2"},
-		},
+	}, &config.FeedItem{
+		GUID:       "err#123",
+		Link:       "link_new",
+		Title:      "title",
+		Categories: []string{"cat1", "cat2"},
 	}, 123)
 	if assert.NoError(t.T(), err) {
 		var entries []entity.Entry

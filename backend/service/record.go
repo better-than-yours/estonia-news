@@ -18,8 +18,7 @@ func DeleteRecord(params *config.Params, entry entity.Entry) error {
 }
 
 // UpsertRecord perform add/update record
-func UpsertRecord(params *config.Params, messageID int) error {
-	var item = params.Item
+func UpsertRecord(params *config.Params, item *config.FeedItem, messageID int) error {
 	pubDate, err := time.Parse(time.RFC1123Z, item.Published)
 	if err != nil {
 		misc.Fatal("parse_date", "parse date", err)
