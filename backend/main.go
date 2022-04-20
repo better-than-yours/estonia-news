@@ -82,6 +82,7 @@ func sendMessage(params *config.Params, msg tgbotapi.Chattable) (*tgbotapi.Messa
 	if err != nil {
 		if strings.Contains(err.Error(), "message is not modified") {
 			misc.Error("send_message", "send message", err)
+			return &sendedMsg, nil
 		} else if strings.Contains(err.Error(), "there is no caption in the message to edit") {
 			misc.Error("send_message", "send message", err)
 		}
