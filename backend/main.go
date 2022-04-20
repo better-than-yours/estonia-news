@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
+	"estonia-news/command"
 	"estonia-news/config"
 	"estonia-news/db"
 	"estonia-news/entity"
@@ -198,10 +200,40 @@ func main() {
 	_ = godotenv.Load()
 	misc.InitMetrics(os.Getenv("PROMETHEUS_URL"), os.Getenv("PROMETHEUS_JOB"))
 	dbConnect := db.Connect(os.Getenv("DB_HOST"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"))
-	bot, chatID := telegram.Connect(os.Getenv("TELEGRAM_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID"))
+	bot := telegram.Connect(os.Getenv("TELEGRAM_TOKEN"))
 	bot.Debug = os.Getenv("DEBUG") == "true"
 	misc.L.Logf("INFO authorized on account '%s'", bot.Self.UserName)
+	commander := os.Getenv("COMMANDER")
+	if len(commander) > 0 {
+		handleCommand(dbConnect, bot, commander)
+	} else {
+		handleNews(dbConnect, bot)
+	}
+}
 
+func handleCommand(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, commander string) {
+	u := tgbotapi.NewUpdate(0)
+	u.Timeout = 60
+	updates, err := bot.GetUpdatesChan(u)
+	if err != nil {
+		misc.Fatal("get_updates", "get updates", err)
+	}
+	for update := range updates {
+		if update.Message == nil && update.Message.From.UserName != commander {
+			continue
+		}
+		if update.Message.IsCommand() {
+			command.ExecCommand(dbConnect, bot, &update)
+		}
+		misc.PushMetrics()
+	}
+}
+
+func handleNews(dbConnect *gorm.DB, bot *tgbotapi.BotAPI) {
+	chatID, err := strconv.ParseInt(os.Getenv("TELEGRAM_CHAT_ID"), 10, 64)
+	if err != nil {
+		misc.Fatal("tg_chat_id", "chat id", err)
+	}
 	go cleanUp(dbConnect)
 	job(dbConnect, bot, chatID)
 	misc.PushMetrics()
