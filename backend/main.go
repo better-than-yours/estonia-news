@@ -31,29 +31,12 @@ func hasChanges(item *config.FeedItem, entry entity.Entry) bool {
 	return false
 }
 
-func addRecord(params *config.Params, item *config.FeedItem) error {
+func checkRecord(params *config.Params, item *config.FeedItem) error {
 	var entry entity.Entry
 	result := params.DB.First(&entry, "guid = ?", item.GUID)
 	if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		if hasChanges(item, entry) {
-			misc.L.Logf("INFO send edit message '%s'", entry.GUID)
-			msg, err := service.Edit(params, item, entry)
-			if err != nil {
-				if strings.Contains(err.Error(), "message to edit not found") {
-					if err = service.DeleteRecord(params, entry); err != nil {
-						misc.Error("delete_record", fmt.Sprintf("delete record '%s'", entry.GUID), err)
-						return err
-					}
-					time.Sleep(config.TimeoutBetweenMessages)
-				}
-				return err
-			}
-			sendedMsg, err := sendMessage(params, msg)
-			if err != nil {
-				return err
-			}
-			err = service.UpsertRecord(params, item, sendedMsg.MessageID)
-			if err != nil {
+			if err := editMessage(params, item, entry); err != nil {
 				return err
 			}
 		}
@@ -62,6 +45,38 @@ func addRecord(params *config.Params, item *config.FeedItem) error {
 	if !isValidItemByTerm(item) {
 		return nil
 	}
+	if err := newMessage(params, item); err != nil {
+		return err
+	}
+	time.Sleep(config.TimeoutBetweenMessages)
+	return nil
+}
+
+func editMessage(params *config.Params, item *config.FeedItem, entry entity.Entry) error {
+	misc.L.Logf("INFO send edit message '%s'", entry.GUID)
+	msg, err := service.Edit(params, item, entry)
+	if err != nil {
+		if strings.Contains(err.Error(), "message to edit not found") {
+			if err = service.DeleteRecord(params, entry); err != nil {
+				misc.Error("delete_record", fmt.Sprintf("delete record '%s'", entry.GUID), err)
+				return err
+			}
+			time.Sleep(config.TimeoutBetweenMessages)
+		}
+		return err
+	}
+	_, err = sendMessage(params, msg)
+	if err != nil {
+		return err
+	}
+	err = service.UpsertRecord(params, item, entry.MessageID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func newMessage(params *config.Params, item *config.FeedItem) error {
 	misc.L.Logf("INFO send message '%s'", item.GUID)
 	msg, err := service.Add(params, item)
 	if err != nil {
@@ -71,22 +86,26 @@ func addRecord(params *config.Params, item *config.FeedItem) error {
 	if err != nil {
 		return err
 	}
+	if sendedMsg.MessageID == 0 {
+		err = errors.New("empty MessageID")
+		misc.Error("add_record", fmt.Sprintf("add record '%s'", item.GUID), err)
+		return err
+	}
 	err = service.UpsertRecord(params, item, sendedMsg.MessageID)
 	if err != nil {
 		return err
 	}
-	time.Sleep(config.TimeoutBetweenMessages)
 	return nil
 }
 
 func sendMessage(params *config.Params, msg tgbotapi.Chattable) (*tgbotapi.Message, error) {
 	sendedMsg, err := params.Bot.Send(msg)
 	if err != nil {
-		if strings.Contains(err.Error(), "message is not modified") {
+		if funk.Contains([]string{"message is not modified", "there is no caption in the message to edit"}, func(item string) bool {
+			return strings.Contains(err.Error(), item)
+		}) {
 			misc.Error("send_message", "send message", err)
 			return &sendedMsg, nil
-		} else if strings.Contains(err.Error(), "there is no caption in the message to edit") {
-			misc.Error("send_message", "send message", err)
 		}
 		return nil, err
 	}
@@ -174,8 +193,8 @@ func addMissingEntries(params *config.Params, items []*config.FeedItem) error {
 		if found {
 			continue
 		}
-		if err := addRecord(params, item); err != nil {
-			misc.Error("add_record", fmt.Sprintf("add record '%s'", item.GUID), err)
+		if err := checkRecord(params, item); err != nil {
+			misc.Error("check_record", fmt.Sprintf("check record '%s'", item.GUID), err)
 			return err
 		}
 	}
