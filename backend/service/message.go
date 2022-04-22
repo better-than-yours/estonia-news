@@ -159,7 +159,7 @@ func Edit(params *config.Params, item *config.FeedItem, entry entity.Entry) (*tg
 // Delete is delete message
 func Delete(params *config.Params, entry entity.Entry) error {
 	msg := deleteMessageObject(params, entry.MessageID)
-	_, err := params.Bot.Send(msg)
+	_, err := params.Bot.Request(msg)
 	if err != nil {
 		return err
 	}
