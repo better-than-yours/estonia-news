@@ -25,7 +25,7 @@ func UpsertRecord(params *config.Params, item *config.FeedItem, messageID int) e
 	}
 	entry := entity.Entry{
 		GUID:        item.GUID,
-		Provider:    params.Provider,
+		ProviderID:  params.Provider.ID,
 		Link:        item.Link,
 		Title:       item.Title,
 		Description: item.Description,
@@ -42,8 +42,8 @@ func UpsertRecord(params *config.Params, item *config.FeedItem, messageID int) e
 	}
 	for _, categoryName := range item.Categories {
 		category := entity.Category{
-			Name:     categoryName,
-			Provider: params.Provider,
+			Name:       categoryName,
+			ProviderID: params.Provider.ID,
 		}
 		result = params.DB.Where(category).FirstOrCreate(&category)
 		if result.Error != nil {

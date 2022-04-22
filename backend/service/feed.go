@@ -17,8 +17,8 @@ func AddMissedCategories(params *config.Params, items []*gofeed.Item) (map[strin
 	categoriesMap := make(map[string]int)
 	for _, categoryName := range categories {
 		category := entity.Category{
-			Name:     categoryName,
-			Provider: params.Provider,
+			Name:       categoryName,
+			ProviderID: params.Provider.ID,
 		}
 		result := params.DB.Where(category).FirstOrCreate(&category)
 		if result.Error != nil {

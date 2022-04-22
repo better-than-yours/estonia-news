@@ -127,12 +127,12 @@ func (t *SuiteTest) Test_Record_UpsertRecord_Update() {
 }
 
 func (t *SuiteTest) Test_Record_AddMissedCategories() {
-	provider := entity.Provider{URL: "err.ee"}
-	t.db.Create(&provider)
+	providers := []entity.Provider{{URL: "err.ee"}, {URL: "pm.ee"}}
+	t.db.Create(&providers)
 
 	categoriesMap, err := service.AddMissedCategories(&config.Params{
 		DB:       t.db,
-		Provider: provider,
+		Provider: providers[0],
 	}, []*gofeed.Item{{
 		Categories: []string{"cat1", "cat2"},
 	}, {
@@ -146,8 +146,32 @@ func (t *SuiteTest) Test_Record_AddMissedCategories() {
 		assert.Equal(t.T(), "cat1", categories[0].Name)
 		assert.Equal(t.T(), "cat2", categories[1].Name)
 		assert.Equal(t.T(), "cat3", categories[2].Name)
+		assert.Equal(t.T(), providers[0].ID, categories[0].ProviderID)
+		assert.Equal(t.T(), providers[0].ID, categories[1].ProviderID)
+		assert.Equal(t.T(), providers[0].ID, categories[2].ProviderID)
 		assert.Equal(t.T(), 1, categoriesMap["cat1"])
 		assert.Equal(t.T(), 2, categoriesMap["cat2"])
 		assert.Equal(t.T(), 3, categoriesMap["cat3"])
+	}
+
+	categoriesMap, err = service.AddMissedCategories(&config.Params{
+		DB:       t.db,
+		Provider: providers[1],
+	}, []*gofeed.Item{{
+		Categories: []string{"cat1", "cat3"},
+	}, {
+		Categories: []string{"cat1"},
+	}})
+	if assert.NoError(t.T(), err) {
+		var categories []entity.Category
+		result2 := t.db.Find(&categories)
+		assert.EqualValues(t.T(), 5, result2.RowsAffected)
+		assert.NoError(t.T(), result2.Error)
+		assert.Equal(t.T(), "cat1", categories[3].Name)
+		assert.Equal(t.T(), "cat3", categories[4].Name)
+		assert.Equal(t.T(), providers[1].ID, categories[3].ProviderID)
+		assert.Equal(t.T(), providers[1].ID, categories[4].ProviderID)
+		assert.Equal(t.T(), 4, categoriesMap["cat1"])
+		assert.Equal(t.T(), 5, categoriesMap["cat3"])
 	}
 }
