@@ -281,13 +281,23 @@ func job(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, chatID int64) {
 		if err != nil {
 			misc.Fatal("get_feed", "get feed", err)
 		}
+		blocks, err := entity.GetListBlocks(dbConnect)
+		if err != nil {
+			misc.Fatal("get_blocked_categories", "get blocked categories", err)
+		}
+		blocks = funk.Filter(blocks, func(item entity.BlockedCategory) bool {
+			return item.Category.ProviderID == provider.ID
+		}).([]entity.BlockedCategory)
+		blockedCategories := funk.Map(blocks, func(item entity.BlockedCategory) string {
+			return item.Category.Name
+		}).([]string)
 		params := &config.Params{
 			Bot:               bot,
 			DB:                dbConnect,
 			Feed:              feed,
 			Provider:          provider,
 			ChatID:            chatID,
-			BlockedCategories: provider.BlockedCategories,
+			BlockedCategories: blockedCategories,
 			BlockedWords:      provider.BlockedWords,
 		}
 		categoriesMap, err := service.AddMissedCategories(params, feed.Items)

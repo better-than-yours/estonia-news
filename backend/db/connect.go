@@ -13,7 +13,7 @@ import (
 
 // GetModels return list of models
 func GetModels() []any {
-	return []any{&entity.Provider{}, &entity.Category{}, &entity.Entry{}, &entity.EntryToCategory{}}
+	return []any{&entity.Provider{}, &entity.Category{}, &entity.Entry{}, &entity.EntryToCategory{}, &entity.BlockedCategory{}}
 }
 
 // Connect return db connection

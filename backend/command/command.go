@@ -1,11 +1,15 @@
 package command
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 
+	"estonia-news/entity"
 	"estonia-news/misc"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/thoas/go-funk"
 	"gorm.io/gorm"
 )
 
@@ -15,15 +19,24 @@ func ExecCommand(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, update *tgbotapi.Upda
 	command := update.Message.CommandArguments()
 	switch update.Message.Command() {
 	case "info":
-		msg.Text = getEntryByID(dbConnect, command)
-	case "add":
+		res, _ := entity.GetEntryByID(dbConnect, command)
+		categories := funk.Map(res.Categories, func(item entity.EntryToCategory) string {
+			return fmt.Sprintf("%d - %s", item.CategoryID, item.Category.Name)
+		}).([]string)
+		msg.Text = strings.Join(append([]string{fmt.Sprintf("%s %s", res.GUID, res.Title)}, categories...), "\n")
+	case "add_block":
 		categoryID, _ := strconv.Atoi(command)
-		msg.Text = addCategoryToBlock(dbConnect, categoryID)
-	case "delete":
+		_ = entity.AddCategoryToBlock(dbConnect, categoryID)
+		msg.Text = "done"
+	case "delete_block":
 		categoryID, _ := strconv.Atoi(command)
-		msg.Text = deleteCategoryFromBlock(dbConnect, categoryID)
-	case "list":
-		msg.Text = getListBlocks(dbConnect)
+		_ = entity.DeleteCategoryFromBlock(dbConnect, categoryID)
+		msg.Text = "done"
+	case "list_blocks":
+		res, _ := entity.GetListBlocks(dbConnect)
+		msg.Text = strings.Join(funk.Map(res, func(block entity.BlockedCategory) string {
+			return fmt.Sprintf("%d %s %s", block.CategoryID, block.Category.Name, block.Category.Provider.Lang)
+		}).([]string), "\n")
 	default:
 		return
 	}
@@ -33,20 +46,4 @@ func ExecCommand(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, update *tgbotapi.Upda
 			misc.Error("send_message", "send message", err)
 		}
 	}
-}
-
-func getEntryByID(dbConnect *gorm.DB, entryID string) string {
-	return ""
-}
-
-func addCategoryToBlock(dbConnect *gorm.DB, categoryID int) string {
-	return ""
-}
-
-func deleteCategoryFromBlock(dbConnect *gorm.DB, categoryID int) string {
-	return ""
-}
-
-func getListBlocks(dbConnect *gorm.DB) string {
-	return ""
 }

@@ -24,11 +24,10 @@ type Entry struct {
 
 // Provider is a provider structure
 type Provider struct {
-	ID                int `gorm:"primaryKey"`
-	URL               string
-	Lang              string
-	BlockedCategories pq.StringArray `gorm:"type:text[]"`
-	BlockedWords      pq.StringArray `gorm:"type:text[]"`
+	ID           int `gorm:"primaryKey"`
+	URL          string
+	Lang         string
+	BlockedWords pq.StringArray `gorm:"type:text[]"`
 }
 
 // Category is a category structure
@@ -41,8 +40,15 @@ type Category struct {
 
 // EntryToCategory is a map entry and a category structures
 type EntryToCategory struct {
-	EntryID    string `gorm:"primaryKey"`
-	CategoryID int    `gorm:"primaryKey"`
+	EntryID    string   `gorm:"primaryKey"`
+	CategoryID int      `gorm:"primaryKey"`
+	Category   Category `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+}
+
+// BlockedCategory is list blocked categories
+type BlockedCategory struct {
+	CategoryID int      `gorm:"primaryKey"`
+	Category   Category `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 // UpsertEntry is function for upsert entry
