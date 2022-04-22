@@ -17,7 +17,7 @@ import (
 	"estonia-news/service"
 	"estonia-news/telegram"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
 	"github.com/mmcdole/gofeed"
 	"github.com/thoas/go-funk"
@@ -232,11 +232,8 @@ func main() {
 
 func handleCommand(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, commander string) {
 	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-	updates, err := bot.GetUpdatesChan(u)
-	if err != nil {
-		misc.Fatal("get_updates", "get updates", err)
-	}
+	u.Timeout = 30
+	updates := bot.GetUpdatesChan(u)
 	for update := range updates {
 		if update.Message == nil && update.Message.From.UserName != commander {
 			continue

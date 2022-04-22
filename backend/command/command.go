@@ -8,7 +8,7 @@ import (
 	"estonia-news/entity"
 	"estonia-news/misc"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/thoas/go-funk"
 	"gorm.io/gorm"
 )

@@ -10,7 +10,7 @@ import (
 	"estonia-news/entity"
 	"estonia-news/misc"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func renderMessageBlock(msg *Message, title, description string) string {
@@ -70,9 +70,8 @@ func createMessageObject(params *config.Params, msg *Message) (tgbotapi.Chattabl
 		file := tgbotapi.FileBytes{Name: msg.ImageURL, Bytes: content}
 		obj = tgbotapi.PhotoConfig{
 			BaseFile: tgbotapi.BaseFile{
-				BaseChat:    tgbotapi.BaseChat{ChatID: params.ChatID},
-				File:        file,
-				UseExisting: false,
+				BaseChat: tgbotapi.BaseChat{ChatID: params.ChatID},
+				File:     file,
 			},
 			Caption:   text,
 			ParseMode: tgbotapi.ModeHTML,

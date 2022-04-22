@@ -3,7 +3,7 @@ package telegram
 import (
 	"estonia-news/misc"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 // Connect do connection to telegram
