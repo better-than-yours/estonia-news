@@ -215,6 +215,20 @@ func cleanUp(dbConnect *gorm.DB) {
 	}
 }
 
+func pushMetrics() {
+	ticker := time.NewTicker(config.PushMetricsEvery)
+	quit := make(chan struct{})
+	for {
+		select {
+		case <-ticker.C:
+			misc.PushMetrics()
+		case <-quit:
+			ticker.Stop()
+			return
+		}
+	}
+}
+
 func main() {
 	_ = godotenv.Load()
 	misc.InitMetrics(os.Getenv("PROMETHEUS_URL"), os.Getenv("PROMETHEUS_JOB"))
@@ -223,6 +237,7 @@ func main() {
 	bot.Debug = os.Getenv("DEBUG") == "true"
 	misc.L.Logf("INFO authorized on account '%s'", bot.Self.UserName)
 	commander := os.Getenv("COMMANDER")
+	go pushMetrics()
 	if len(commander) > 0 {
 		handleCommand(dbConnect, bot, commander)
 	} else {
@@ -231,17 +246,14 @@ func main() {
 }
 
 func handleCommand(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, commander string) {
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 30
-	updates := bot.GetUpdatesChan(u)
+	updateConfig := tgbotapi.NewUpdate(0)
+	updateConfig.Timeout = 60
+	updates := bot.GetUpdatesChan(updateConfig)
 	for update := range updates {
-		if update.Message == nil && update.Message.From.UserName != commander {
-			continue
+		isValidCommand := update.Message.IsCommand() && update.Message != nil && update.Message.From.UserName == commander
+		if isValidCommand {
+			command.ExecCommand(dbConnect, bot, update.Message)
 		}
-		if update.Message.IsCommand() {
-			command.ExecCommand(dbConnect, bot, &update)
-		}
-		misc.PushMetrics()
 	}
 }
 
@@ -252,7 +264,6 @@ func handleNews(dbConnect *gorm.DB, bot *tgbotapi.BotAPI) {
 	}
 	go cleanUp(dbConnect)
 	job(dbConnect, bot, chatID)
-	misc.PushMetrics()
 
 	ticker := time.NewTicker(config.TimeoutBetweenLoops)
 	quit := make(chan struct{})
@@ -260,7 +271,6 @@ func handleNews(dbConnect *gorm.DB, bot *tgbotapi.BotAPI) {
 		select {
 		case <-ticker.C:
 			job(dbConnect, bot, chatID)
-			misc.PushMetrics()
 		case <-quit:
 			ticker.Stop()
 			return

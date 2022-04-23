@@ -14,44 +14,60 @@ import (
 )
 
 // ExecCommand is exec command
-func ExecCommand(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, update *tgbotapi.Update) {
-	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
-	command := update.Message.CommandArguments()
-	switch update.Message.Command() {
+func ExecCommand(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
+	msg := tgbotapi.NewMessage(message.Chat.ID, "")
+	command := message.CommandArguments()
+	switch message.Command() {
 	case "info":
 		res, err := entity.GetEntryByID(dbConnect, command)
-		if err == nil {
-			categories := funk.Map(res.Categories, func(item entity.EntryToCategory) string {
-				return fmt.Sprintf("%d - %s", item.CategoryID, item.Category.Name)
-			}).([]string)
-			msg.Text = strings.Join(append([]string{fmt.Sprintf("%s %s", res.GUID, res.Title)}, categories...), "\n")
+		if err != nil {
+			misc.Error("exec_command", "info", err)
+			return
 		}
+		categories := funk.Map(res.Categories, func(item entity.EntryToCategory) string {
+			return fmt.Sprintf("%d - %s", item.CategoryID, item.Category.Name)
+		}).([]string)
+		msg.Text = strings.Join(append([]string{fmt.Sprintf("%s %s", res.GUID, res.Title)}, categories...), "\n")
 	case "add_block":
 		categoryID, err := strconv.Atoi(command)
-		if err == nil {
-			_ = entity.AddCategoryToBlock(dbConnect, categoryID)
-			msg.Text = "done"
+		if err != nil {
+			misc.Error("exec_command", "add block", err)
+			return
 		}
+		err = entity.AddCategoryToBlock(dbConnect, categoryID)
+		if err != nil {
+			misc.Error("exec_command", "add block", err)
+			return
+		}
+		msg.Text = "done"
 	case "delete_block":
 		categoryID, err := strconv.Atoi(command)
-		if err == nil {
-			_ = entity.DeleteCategoryFromBlock(dbConnect, categoryID)
-			msg.Text = "done"
+		if err != nil {
+			misc.Error("exec_command", "delete block", err)
+			return
 		}
+		err = entity.DeleteCategoryFromBlock(dbConnect, categoryID)
+		if err != nil {
+			misc.Error("exec_command", "delete block", err)
+			return
+		}
+		msg.Text = "done"
 	case "list_blocks":
 		res, err := entity.GetListBlocks(dbConnect)
-		if err == nil {
-			msg.Text = strings.Join(funk.Map(res, func(block entity.BlockedCategory) string {
-				return fmt.Sprintf("%d %s %s", block.CategoryID, block.Category.Name, block.Category.Provider.Lang)
-			}).([]string), "\n")
+		if err != nil {
+			misc.Error("exec_command", "list blocks", err)
+			return
 		}
+		msg.Text = strings.Join(funk.Map(res, func(block entity.BlockedCategory) string {
+			return fmt.Sprintf("%d %s %s", block.CategoryID, block.Category.Name, block.Category.Provider.Lang)
+		}).([]string), "\n")
 	default:
 		return
 	}
 	if len(msg.Text) > 0 {
 		_, err := bot.Send(msg)
 		if err != nil {
-			misc.Error("send_message", "send message", err)
+			misc.Error("exec_command", "send message", err)
 		}
 	}
 }

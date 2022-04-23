@@ -22,6 +22,9 @@ var TimeShift = time.Hour
 // PurgeOldEntriesEvery is time for purge old entries
 var PurgeOldEntriesEvery = time.Hour
 
+// PushMetricsEvery is time for push metrics
+var PushMetricsEvery = 5 * time.Second
+
 // Params is params struct
 type Params struct {
 	Bot               *tgbotapi.BotAPI

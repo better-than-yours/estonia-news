@@ -116,7 +116,6 @@ func Add(params *config.Params, item *config.FeedItem) (tgbotapi.Chattable, erro
 	imageURL, err := getImageURL(item.Link)
 	if err != nil {
 		misc.Error("get_image_url", "get image url", err)
-		misc.PushMetrics()
 		imageURL = ""
 	}
 	_, err = url.ParseRequestURI(imageURL)
@@ -143,7 +142,6 @@ func Edit(params *config.Params, item *config.FeedItem, entry entity.Entry) (*tg
 	imageURL, err := getImageURL(item.Link)
 	if err != nil {
 		misc.Error("get_image_url", "get image url", err)
-		misc.PushMetrics()
 		imageURL = ""
 	}
 	msg := editMessageObject(params, entry.MessageID, &Message{
