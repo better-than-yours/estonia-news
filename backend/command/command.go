@@ -1,25 +1,26 @@
 package command
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"estonia-news/config"
 	"estonia-news/entity"
 	"estonia-news/misc"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/thoas/go-funk"
-	"gorm.io/gorm"
 )
 
 // ExecCommand is exec command
-func ExecCommand(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
+func ExecCommand(ctx context.Context, message *tgbotapi.Message) {
 	msg := tgbotapi.NewMessage(message.Chat.ID, "")
 	command := message.CommandArguments()
 	switch message.Command() {
 	case "info":
-		res, err := entity.GetEntryByID(dbConnect, command)
+		res, err := entity.GetEntryByID(ctx, command)
 		if err != nil {
 			misc.Error("exec_command", "info", err)
 			return
@@ -27,14 +28,14 @@ func ExecCommand(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, message *tgbotapi.Mes
 		categories := funk.Map(res.Categories, func(item entity.EntryToCategory) string {
 			return fmt.Sprintf("%d - %s", item.CategoryID, item.Category.Name)
 		}).([]string)
-		msg.Text = strings.Join(append([]string{fmt.Sprintf("%s %s", res.GUID, res.Title)}, categories...), "\n")
+		msg.Text = strings.Join(append([]string{fmt.Sprintf("%s %s", res.ID, res.Title)}, categories...), "\n")
 	case "add_block":
 		categoryID, err := strconv.Atoi(command)
 		if err != nil {
 			misc.Error("exec_command", "add block", err)
 			return
 		}
-		err = entity.AddCategoryToBlock(dbConnect, categoryID)
+		err = entity.AddCategoryToBlock(ctx, categoryID)
 		if err != nil {
 			misc.Error("exec_command", "add block", err)
 			return
@@ -46,14 +47,14 @@ func ExecCommand(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, message *tgbotapi.Mes
 			misc.Error("exec_command", "delete block", err)
 			return
 		}
-		err = entity.DeleteCategoryFromBlock(dbConnect, categoryID)
+		err = entity.DeleteCategoryFromBlock(ctx, categoryID)
 		if err != nil {
 			misc.Error("exec_command", "delete block", err)
 			return
 		}
 		msg.Text = "done"
 	case "list_blocks":
-		res, err := entity.GetListBlocks(dbConnect)
+		res, err := entity.GetListBlocks(ctx)
 		if err != nil {
 			misc.Error("exec_command", "list blocks", err)
 			return
@@ -65,6 +66,7 @@ func ExecCommand(dbConnect *gorm.DB, bot *tgbotapi.BotAPI, message *tgbotapi.Mes
 		return
 	}
 	if len(msg.Text) > 0 {
+		bot := ctx.Value(config.CtxBotKey).(*tgbotapi.BotAPI)
 		_, err := bot.Send(msg)
 		if err != nil {
 			misc.Error("exec_command", "send message", err)

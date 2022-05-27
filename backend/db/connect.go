@@ -1,32 +1,43 @@
 package db
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
+	"runtime"
 
-	"estonia-news/entity"
-	"estonia-news/misc"
+	"estonia-news/config"
+	"estonia-news/migrations"
 
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/driver/pgdriver"
+	"github.com/uptrace/bun/migrate"
 )
 
-// GetModels return list of models
-func GetModels() []any {
-	return []any{&entity.Provider{}, &entity.Category{}, &entity.Entry{}, &entity.EntryToCategory{}, &entity.BlockedCategory{}}
+// Connect return db connection
+func Connect(host, user, password, name string) *bun.DB {
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable", user, password, host, name)
+	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
+
+	maxOpenConns := 4 * runtime.GOMAXPROCS(0)
+	sqldb.SetMaxOpenConns(maxOpenConns)
+	sqldb.SetMaxIdleConns(maxOpenConns)
+
+	return bun.NewDB(sqldb, pgdialect.New(), bun.WithDiscardUnknownColumns())
 }
 
-// Connect return db connection
-func Connect(host, user, password, name string) *gorm.DB {
-	db, err := gorm.Open(postgres.New(postgres.Config{
-		DSN: fmt.Sprintf("host=%s user=%s password=%s dbname=%s", host, user, password, name),
-	}), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+// Migrate is application of a migration to a database
+func Migrate(ctx context.Context) {
+	dbConnect := ctx.Value(config.CtxDBKey).(*bun.DB)
+	migrator := migrate.NewMigrator(dbConnect, migrations.Migrations)
+	err := migrator.Init(ctx)
 	if err != nil {
-		misc.Fatal("db_connect", "failed to connect database", err)
+		panic(err)
 	}
-	err = db.AutoMigrate(GetModels()...)
+	group, err := migrator.Migrate(ctx)
 	if err != nil {
-		misc.Fatal("db_migration", "db migration", err)
+		panic(err)
 	}
-	return db
+	fmt.Printf("migrated to %s\n", group)
 }

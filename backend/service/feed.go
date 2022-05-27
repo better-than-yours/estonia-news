@@ -1,15 +1,19 @@
 package service
 
 import (
+	"context"
 	"estonia-news/config"
 	"estonia-news/entity"
 
 	"github.com/mmcdole/gofeed"
 	"github.com/thoas/go-funk"
+	"github.com/uptrace/bun"
 )
 
 // AddMissedCategories perform add missed categories
-func AddMissedCategories(params *config.Params, items []*gofeed.Item) (map[string]int, error) {
+func AddMissedCategories(ctx context.Context, items []*gofeed.Item) (map[string]int, error) {
+	dbConnect := ctx.Value(config.CtxDBKey).(*bun.DB)
+	provider := ctx.Value(config.CtxProviderKey).(*entity.Provider)
 	categories := funk.FlatMap(items, func(v *gofeed.Item) []string {
 		return v.Categories
 	}).([]string)
@@ -18,11 +22,17 @@ func AddMissedCategories(params *config.Params, items []*gofeed.Item) (map[strin
 	for _, categoryName := range categories {
 		category := entity.Category{
 			Name:       categoryName,
-			ProviderID: params.Provider.ID,
+			ProviderID: provider.ID,
 		}
-		result := params.DB.Where(category).FirstOrCreate(&category)
-		if result.Error != nil {
-			return nil, result.Error
+		_, err := dbConnect.NewInsert().Model(&category).On("CONFLICT (name, provider_id) DO NOTHING").Exec(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if category.ID == 0 {
+			err = dbConnect.NewSelect().Model(&category).Where("name = ? AND provider_id = ?", categoryName, provider.ID).Scan(ctx)
+			if err != nil {
+				return nil, err
+			}
 		}
 		categoriesMap[categoryName] = category.ID
 	}

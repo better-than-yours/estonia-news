@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -28,10 +29,11 @@ func FormatText(text string) string {
 	return text
 }
 
-func getText(params *config.Params, msg *Message) (title, description string) {
+func getText(ctx context.Context, msg *Message) (title, description string) {
+	provider := ctx.Value(config.CtxProviderKey).(*entity.Provider)
 	title = FormatText(msg.Title)
 	description = FormatText(msg.Description)
-	if params.Provider.Lang == "EST" {
+	if provider.Lang == "EST" {
 		if title != "" {
 			text, err := translate(title, "et", "en")
 			if err != nil {
@@ -50,14 +52,14 @@ func getText(params *config.Params, msg *Message) (title, description string) {
 	return
 }
 
-func createMessageObject(params *config.Params, msg *Message) (tgbotapi.Chattable, error) {
-	title, description := getText(params, msg)
+func createMessageObject(ctx context.Context, msg *Message) (tgbotapi.Chattable, error) {
+	title, description := getText(ctx, msg)
 	text := renderMessageBlock(msg, title, description)
-
+	chatID := ctx.Value(config.CtxChatIDKey).(int64)
 	var obj tgbotapi.Chattable
 	if msg.ImageURL == "" {
 		obj = tgbotapi.MessageConfig{
-			BaseChat:              tgbotapi.BaseChat{ChatID: params.ChatID},
+			BaseChat:              tgbotapi.BaseChat{ChatID: chatID},
 			Text:                  text,
 			ParseMode:             tgbotapi.ModeHTML,
 			DisableWebPagePreview: true,
@@ -68,9 +70,10 @@ func createMessageObject(params *config.Params, msg *Message) (tgbotapi.Chattabl
 			return nil, err
 		}
 		file := tgbotapi.FileBytes{Name: msg.ImageURL, Bytes: content}
+		chatID := ctx.Value(config.CtxChatIDKey).(int64)
 		obj = tgbotapi.PhotoConfig{
 			BaseFile: tgbotapi.BaseFile{
-				BaseChat: tgbotapi.BaseChat{ChatID: params.ChatID},
+				BaseChat: tgbotapi.BaseChat{ChatID: chatID},
 				File:     file,
 			},
 			Caption:   text,
@@ -81,12 +84,13 @@ func createMessageObject(params *config.Params, msg *Message) (tgbotapi.Chattabl
 	return obj, nil
 }
 
-func editMessageObject(params *config.Params, messageID int, msg *Message) *tgbotapi.EditMessageCaptionConfig {
-	title, description := getText(params, msg)
+func editMessageObject(ctx context.Context, messageID int, msg *Message) *tgbotapi.EditMessageCaptionConfig {
+	title, description := getText(ctx, msg)
 	text := renderMessageBlock(msg, title, description)
+	chatID := ctx.Value(config.CtxChatIDKey).(int64)
 	return &tgbotapi.EditMessageCaptionConfig{
 		BaseEdit: tgbotapi.BaseEdit{
-			ChatID:    params.ChatID,
+			ChatID:    chatID,
 			MessageID: messageID,
 		},
 		Caption:   text,
@@ -94,9 +98,10 @@ func editMessageObject(params *config.Params, messageID int, msg *Message) *tgbo
 	}
 }
 
-func deleteMessageObject(params *config.Params, messageID int) *tgbotapi.DeleteMessageConfig {
+func deleteMessageObject(ctx context.Context, messageID int) *tgbotapi.DeleteMessageConfig {
+	chatID := ctx.Value(config.CtxChatIDKey).(int64)
 	return &tgbotapi.DeleteMessageConfig{
-		ChatID:    params.ChatID,
+		ChatID:    chatID,
 		MessageID: messageID,
 	}
 }
@@ -112,7 +117,7 @@ type Message struct {
 }
 
 // Add is add message
-func Add(params *config.Params, item *config.FeedItem) (tgbotapi.Chattable, error) {
+func Add(ctx context.Context, item *config.FeedItem) (tgbotapi.Chattable, error) {
 	imageURL, err := getImageURL(item.Link)
 	if err != nil {
 		misc.Error("get_image_url", "get image url", err)
@@ -123,8 +128,9 @@ func Add(params *config.Params, item *config.FeedItem) (tgbotapi.Chattable, erro
 		misc.Error("parse_image_url", "parse image url", err)
 		imageURL = ""
 	}
-	msg, err := createMessageObject(params, &Message{
-		FeedTitle:   params.Feed.Title,
+	feedTitle := ctx.Value(config.CtxFeedTitleKey).(string)
+	msg, err := createMessageObject(ctx, &Message{
+		FeedTitle:   feedTitle,
 		Title:       item.Title,
 		Description: item.Description,
 		Categories:  item.Categories,
@@ -138,14 +144,15 @@ func Add(params *config.Params, item *config.FeedItem) (tgbotapi.Chattable, erro
 }
 
 // Edit is edit message
-func Edit(params *config.Params, item *config.FeedItem, entry entity.Entry) (*tgbotapi.EditMessageCaptionConfig, error) {
+func Edit(ctx context.Context, item *config.FeedItem, entry entity.Entry) (*tgbotapi.EditMessageCaptionConfig, error) {
 	imageURL, err := getImageURL(item.Link)
 	if err != nil {
 		misc.Error("get_image_url", "get image url", err)
 		imageURL = ""
 	}
-	msg := editMessageObject(params, entry.MessageID, &Message{
-		FeedTitle:   params.Feed.Title,
+	feedTitle := ctx.Value(config.CtxFeedTitleKey).(string)
+	msg := editMessageObject(ctx, entry.MessageID, &Message{
+		FeedTitle:   feedTitle,
 		Title:       item.Title,
 		Description: item.Description,
 		Link:        item.Link,
@@ -155,9 +162,10 @@ func Edit(params *config.Params, item *config.FeedItem, entry entity.Entry) (*tg
 }
 
 // Delete is delete message
-func Delete(params *config.Params, entry entity.Entry) error {
-	msg := deleteMessageObject(params, entry.MessageID)
-	_, err := params.Bot.Request(msg)
+func Delete(ctx context.Context, entry entity.Entry) error {
+	bot := ctx.Value(config.CtxBotKey).(*tgbotapi.BotAPI)
+	msg := deleteMessageObject(ctx, entry.MessageID)
+	_, err := bot.Request(msg)
 	if err != nil {
 		return err
 	}
