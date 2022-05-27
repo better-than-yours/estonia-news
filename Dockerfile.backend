@@ -16,6 +16,7 @@ FROM scratch
 
 COPY --from=build-backend /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build-backend /srv/backend/app /srv/app
+COPY --from=build-backend /srv/backend/migrations/*.sql /srv/backend/migrations/
 WORKDIR /srv
 
 CMD ["/srv/app"]
