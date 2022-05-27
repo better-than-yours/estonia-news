@@ -25,7 +25,7 @@ func ExecCommand(ctx context.Context, message *tgbotapi.Message) {
 			misc.Error("exec_command", "info", err)
 			return
 		}
-		categories := funk.Map(res.Categories, func(item entity.EntryToCategory) string {
+		categories := funk.Map(res.Categories, func(item *entity.EntryToCategory) string {
 			return fmt.Sprintf("%d - %s", item.CategoryID, item.Category.Name)
 		}).([]string)
 		msg.Text = strings.Join(append([]string{fmt.Sprintf("%s %s", res.ID, res.Title)}, categories...), "\n")
