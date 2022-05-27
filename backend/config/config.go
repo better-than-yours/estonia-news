@@ -2,12 +2,6 @@ package config
 
 import (
 	"time"
-
-	"estonia-news/entity"
-
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/mmcdole/gofeed"
-	"gorm.io/gorm"
 )
 
 // TimeoutBetweenLoops is main loop timeout
@@ -25,18 +19,6 @@ var PurgeOldEntriesEvery = time.Hour
 // PushMetricsEvery is time for push metrics
 var PushMetricsEvery = 5 * time.Second
 
-// Params is params struct
-type Params struct {
-	Bot               *tgbotapi.BotAPI
-	DB                *gorm.DB
-	Feed              *gofeed.Feed
-	Provider          entity.Provider
-	ChatID            int64
-	Lang              string
-	BlockedCategories []string
-	BlockedWords      []string
-}
-
 // FeedItem is feed item struct
 type FeedItem struct {
 	GUID          string
@@ -47,3 +29,18 @@ type FeedItem struct {
 	Categories    []string
 	CategoriesIds []int
 }
+
+type ctxKey int
+
+const (
+	// CtxDBKey is ctx db key
+	CtxDBKey ctxKey = iota
+	// CtxBotKey is ctx bot key
+	CtxBotKey
+	// CtxProviderKey is ctx provider key
+	CtxProviderKey
+	// CtxChatIDKey is ctx chat id key
+	CtxChatIDKey
+	// CtxFeedTitleKey is ctx feed title key
+	CtxFeedTitleKey
+)

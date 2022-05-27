@@ -1,43 +1,52 @@
 package entity
 
-import "gorm.io/gorm"
+import (
+	"context"
+	"estonia-news/config"
+
+	"github.com/uptrace/bun"
+)
 
 // GetEntryByID get entry info
-func GetEntryByID(dbConnect *gorm.DB, entryID string) (*Entry, error) {
+func GetEntryByID(ctx context.Context, entryID string) (*Entry, error) {
+	dbConnect := ctx.Value(config.CtxDBKey).(*bun.DB)
 	var entry Entry
-	result := dbConnect.Preload("Categories.Category").First(&entry, "guid = ?", entryID)
-	if result.Error != nil {
-		return nil, result.Error
+	err := dbConnect.NewSelect().Model(&entry).Relation("Categories.Category").Where("id = ?", entryID).Scan(ctx)
+	if err != nil {
+		return nil, err
 	}
 	return &entry, nil
 }
 
 // AddCategoryToBlock add category to list blocks
-func AddCategoryToBlock(dbConnect *gorm.DB, categoryID int) error {
-	result := dbConnect.Create(&BlockedCategory{
+func AddCategoryToBlock(ctx context.Context, categoryID int) error {
+	dbConnect := ctx.Value(config.CtxDBKey).(*bun.DB)
+	_, err := dbConnect.NewInsert().Model(&BlockedCategory{
 		CategoryID: categoryID,
-	})
-	if result.Error != nil {
-		return result.Error
+	}).Ignore().Exec(ctx)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
 // DeleteCategoryFromBlock delete category from list blocks
-func DeleteCategoryFromBlock(dbConnect *gorm.DB, categoryID int) error {
-	result := dbConnect.Unscoped().Where("category_id = ?", categoryID).Delete(&BlockedCategory{})
-	if result.Error != nil {
-		return result.Error
+func DeleteCategoryFromBlock(ctx context.Context, categoryID int) error {
+	dbConnect := ctx.Value(config.CtxDBKey).(*bun.DB)
+	_, err := dbConnect.NewDelete().Model(&BlockedCategory{}).Where("category_id = ?", categoryID).Exec(ctx)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
 // GetListBlocks return list blocks
-func GetListBlocks(dbConnect *gorm.DB) ([]BlockedCategory, error) {
+func GetListBlocks(ctx context.Context) ([]BlockedCategory, error) {
+	dbConnect := ctx.Value(config.CtxDBKey).(*bun.DB)
 	var blocks []BlockedCategory
-	result := dbConnect.Preload("Category").Preload("Category.Provider").Find(&blocks)
-	if result.Error != nil {
-		return nil, result.Error
+	err := dbConnect.NewSelect().Model(&blocks).Relation("Category.Provider").Scan(ctx)
+	if err != nil {
+		return nil, err
 	}
 	return blocks, nil
 }

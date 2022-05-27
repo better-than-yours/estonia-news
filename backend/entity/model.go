@@ -3,58 +3,59 @@ package entity
 import (
 	"time"
 
-	"github.com/lib/pq"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
+	"github.com/uptrace/bun"
 )
 
 // Entry is a entry structure
 type Entry struct {
-	GUID        string `gorm:"primaryKey"`
+	bun.BaseModel `bun:"table:entries,alias:e"`
+
+	ID          string `bun:",pk"`
 	Link        string
 	Title       string
 	Description string
 	MessageID   int
-	Categories  []EntryToCategory `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	ProviderID  int               `gorm:"index:provider_id_index;index:provider_id_published_index;index:provider_id_updated_at_index"`
-	Provider    Provider          `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	UpdatedAt   time.Time         `gorm:"index:updated_at_index;index:provider_id_updated_at_index"`
-	Published   time.Time         `gorm:"index:published_index;index:provider_id_published_index"`
+	ProviderID  int
+	UpdatedAt   time.Time `bun:",nullzero,notnull,default:current_timestamp"`
+	PublishedAt time.Time `bun:",nullzero,notnull,default:current_timestamp"`
+
+	Provider   *Provider          `bun:"rel:has-one,join:provider_id=id"`
+	Categories []*EntryToCategory `bun:"rel:has-many,join:id=entry_id"`
 }
 
 // Provider is a provider structure
 type Provider struct {
-	ID           int `gorm:"primaryKey"`
+	bun.BaseModel `bun:"table:providers,alias:p"`
+
+	ID           int `bun:",pk,autoincrement"`
 	URL          string
 	Lang         string
-	BlockedWords pq.StringArray `gorm:"type:text[]"`
+	BlockedWords []string `bun:",array"`
 }
 
 // Category is a category structure
 type Category struct {
-	ID         int      `gorm:"primaryKey"`
-	Name       string   `gorm:"index:name_provider_unique,unique"`
-	ProviderID int      `gorm:"index:name_provider_unique,unique"`
-	Provider   Provider `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	bun.BaseModel `bun:"table:categories,alias:c"`
+
+	ID         int       `bun:",pk,autoincrement"`
+	Name       string    `bun:"unique:uniq_idx_categories"`
+	ProviderID int       `bun:"unique:uniq_idx_categories"`
+	Provider   *Provider `bun:"rel:has-one,join:provider_id=id"`
 }
 
 // EntryToCategory is a map entry and a category structures
 type EntryToCategory struct {
-	EntryID    string   `gorm:"primaryKey"`
-	CategoryID int      `gorm:"primaryKey"`
-	Category   Category `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	bun.BaseModel `bun:"table:entry_to_categories,alias:etc"`
+
+	EntryID    string    `bun:",pk,unique:uniq_idx_entry_to_categories"`
+	CategoryID int       `bun:",pk,unique:uniq_idx_entry_to_categories"`
+	Category   *Category `bun:"rel:has-one,join:category_id=id"`
 }
 
 // BlockedCategory is list blocked categories
 type BlockedCategory struct {
-	CategoryID int      `gorm:"primaryKey"`
-	Category   Category `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-}
+	bun.BaseModel `bun:"table:blocked_categories,alias:bc"`
 
-// UpsertEntry is function for upsert entry
-func UpsertEntry(db *gorm.DB, item *Entry) *gorm.DB {
-	return db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "guid"}},
-		UpdateAll: true,
-	}).Create(item)
+	CategoryID int       `bun:",pk"`
+	Category   *Category `bun:"rel:has-one,join:category_id=id"`
 }
