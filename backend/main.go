@@ -141,9 +141,8 @@ func deleteDeletedEntries(ctx context.Context, items []*config.FeedItem) error {
 		})
 		if !foundEntry {
 			if err := service.Delete(ctx, entry); err != nil {
-				if strings.Contains(err.Error(), "message to delete not found") {
-					misc.Error("delete_message", fmt.Sprintf("delete message '%s'", entry.ID), err)
-				} else {
+				misc.Error("delete_message", fmt.Sprintf("delete message '%s'", entry.ID), err)
+				if !strings.Contains(err.Error(), "message to delete not found") {
 					return err
 				}
 			}
