@@ -156,11 +156,11 @@ func deleteDeletedEntries(ctx context.Context, items []*config.FeedItem) error {
 	return nil
 }
 
-func isValidItemByContent(ctx context.Context, blockedCategories []string, item *config.FeedItem) bool {
+func isValidItemByContent(ctx context.Context, blockedCategories, blockedWords []string, item *config.FeedItem) bool {
 	if len(funk.IntersectString(blockedCategories, item.Categories)) > 0 {
 		return false
 	}
-	foundBlockedWords := funk.FilterString(blockedCategories, func(word string) bool {
+	foundBlockedWords := funk.FilterString(blockedWords, func(word string) bool {
 		return strings.Contains(item.Title, word) || strings.Contains(item.Description, word)
 	})
 	if len(foundBlockedWords) > 0 {
@@ -336,7 +336,7 @@ func job(ctx context.Context, chatID int64) {
 			}
 		}).([]*config.FeedItem)
 		items = funk.Filter(items, func(item *config.FeedItem) bool {
-			return isValidItemByContent(ctx, blockedCategories, item)
+			return isValidItemByContent(ctx, blockedCategories, provider.BlockedWords, item)
 		}).([]*config.FeedItem)
 		sort.Slice(items, func(i, j int) bool {
 			return items[i].Published > items[j].Published
