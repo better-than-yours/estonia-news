@@ -192,12 +192,12 @@ func addMissingEntries(ctx context.Context, items []*config.FeedItem) error {
 		meta, err := service.GetMeta(item.Link)
 		if err != nil {
 			misc.Error("get_meta", "get meta", err)
-			return err
+			continue
 		}
 		_, err = url.ParseRequestURI(meta.ImageURL)
 		if err != nil {
 			misc.Error("parse_image_url", "parse image url", err)
-			return err
+			continue
 		}
 		item.ImageURL = meta.ImageURL
 		if item.Description == "" {
