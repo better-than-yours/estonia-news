@@ -24,6 +24,7 @@ type FeedItem struct {
 	GUID          string
 	Link          string
 	Title         string
+	ImageURL      string
 	Description   string
 	Published     string
 	Categories    []string

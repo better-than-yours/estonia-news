@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -43,9 +44,6 @@ func checkRecord(ctx context.Context, item *config.FeedItem) error {
 				return err
 			}
 		}
-		return nil
-	}
-	if !isValidItemByTerm(item) {
 		return nil
 	}
 	if err := newMessage(ctx, item); err != nil {
@@ -134,7 +132,6 @@ func deleteDeletedEntries(ctx context.Context, items []*config.FeedItem) error {
 	if err != nil {
 		misc.Fatal("query_entries", "query entries", err)
 	}
-	items = funk.Filter(items, isValidItemByTerm).([]*config.FeedItem)
 	for _, entry := range entries {
 		foundEntry := funk.Contains(items, func(item *config.FeedItem) bool {
 			return entry.ID == item.GUID
@@ -163,13 +160,7 @@ func isValidItemByContent(ctx context.Context, blockedCategories, blockedWords [
 	foundBlockedWords := funk.FilterString(blockedWords, func(word string) bool {
 		return strings.Contains(item.Title, word) || strings.Contains(item.Description, word)
 	})
-	if len(foundBlockedWords) > 0 {
-		return false
-	}
-	if item.Description == "" {
-		return false
-	}
-	return true
+	return len(foundBlockedWords) == 0
 }
 
 func isValidItemByTerm(item *config.FeedItem) bool {
@@ -197,6 +188,20 @@ func addMissingEntries(ctx context.Context, items []*config.FeedItem) error {
 		}
 		if found {
 			continue
+		}
+		meta, err := service.GetMeta(item.Link)
+		if err != nil {
+			misc.Error("get_meta", "get meta", err)
+			return err
+		}
+		_, err = url.ParseRequestURI(meta.ImageURL)
+		if err != nil {
+			misc.Error("parse_image_url", "parse image url", err)
+			return err
+		}
+		item.ImageURL = meta.ImageURL
+		if item.Description == "" {
+			item.Description = meta.Description
 		}
 		if err := checkRecord(ctx, item); err != nil {
 			misc.Error("check_record", fmt.Sprintf("check record '%s'", item.GUID), err)
@@ -335,6 +340,7 @@ func job(ctx context.Context, chatID int64) {
 				CategoriesIds: categoriesIds,
 			}
 		}).([]*config.FeedItem)
+		items = funk.Filter(items, isValidItemByTerm).([]*config.FeedItem)
 		items = funk.Filter(items, func(item *config.FeedItem) bool {
 			return isValidItemByContent(ctx, blockedCategories, provider.BlockedWords, item)
 		}).([]*config.FeedItem)
