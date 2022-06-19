@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"regexp"
 	"strings"
 
@@ -118,16 +117,6 @@ type Message struct {
 
 // Add is add message
 func Add(ctx context.Context, item *config.FeedItem) (tgbotapi.Chattable, error) {
-	imageURL, err := getImageURL(item.Link)
-	if err != nil {
-		misc.Error("get_image_url", "get image url", err)
-		imageURL = ""
-	}
-	_, err = url.ParseRequestURI(imageURL)
-	if err != nil {
-		misc.Error("parse_image_url", "parse image url", err)
-		imageURL = ""
-	}
 	feedTitle := ctx.Value(config.CtxFeedTitleKey).(string)
 	msg, err := createMessageObject(ctx, &Message{
 		FeedTitle:   feedTitle,
@@ -135,7 +124,7 @@ func Add(ctx context.Context, item *config.FeedItem) (tgbotapi.Chattable, error)
 		Description: item.Description,
 		Categories:  item.Categories,
 		Link:        item.Link,
-		ImageURL:    imageURL,
+		ImageURL:    item.ImageURL,
 	})
 	if err != nil {
 		misc.Fatal("get_message", "get message", err)
@@ -145,18 +134,14 @@ func Add(ctx context.Context, item *config.FeedItem) (tgbotapi.Chattable, error)
 
 // Edit is edit message
 func Edit(ctx context.Context, item *config.FeedItem, entry entity.Entry) (*tgbotapi.EditMessageCaptionConfig, error) {
-	imageURL, err := getImageURL(item.Link)
-	if err != nil {
-		misc.Error("get_image_url", "get image url", err)
-		imageURL = ""
-	}
 	feedTitle := ctx.Value(config.CtxFeedTitleKey).(string)
 	msg := editMessageObject(ctx, entry.MessageID, &Message{
 		FeedTitle:   feedTitle,
 		Title:       item.Title,
 		Description: item.Description,
+		Categories:  item.Categories,
 		Link:        item.Link,
-		ImageURL:    imageURL,
+		ImageURL:    item.ImageURL,
 	})
 	return msg, nil
 }

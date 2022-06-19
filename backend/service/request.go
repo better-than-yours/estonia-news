@@ -35,33 +35,46 @@ func getImage(imageURL string) ([]byte, error) {
 	return body, nil
 }
 
-func getImageURL(link string) (string, error) {
-	var imageURL string
-	var findImageURL func(*html.Node)
-	findImageURL = func(node *html.Node) {
-		if node.Type == html.ElementNode && node.Data == "meta" && len(node.Attr) > 0 {
-			if funk.Contains(node.Attr, func(attr html.Attribute) bool {
-				return attr.Key == "property" && attr.Val == "og:image"
-			}) {
-				found := funk.Find(node.Attr, func(attr html.Attribute) bool {
-					return attr.Key == "content"
-				})
-				imageURL = found.(html.Attribute).Val
-				return
-			}
-		}
-		for child := node.FirstChild; child != nil; child = child.NextSibling {
-			findImageURL(child)
+func findMeta(node *html.Node, key string) string {
+	if node.Type == html.ElementNode && node.Data == "meta" && len(node.Attr) > 0 {
+		if funk.Contains(node.Attr, func(attr html.Attribute) bool {
+			return attr.Key == "property" && attr.Val == key
+		}) {
+			found := funk.Find(node.Attr, func(attr html.Attribute) bool {
+				return attr.Key == "content"
+			})
+			return found.(html.Attribute).Val
 		}
 	}
+	for child := node.FirstChild; child != nil; child = child.NextSibling {
+		found := findMeta(child, key)
+		if found != "" {
+			return found
+		}
+	}
+	return ""
+}
 
+// Meta is meta struct
+type Meta struct {
+	ImageURL    string
+	Description string
+}
+
+// GetMeta return meta info by url
+func GetMeta(link string) (*Meta, error) {
+	var meta Meta
 	body, _, err := http.Get(link, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	doc, _ := html.Parse(bytes.NewReader(body))
-	findImageURL(doc)
-	return imageURL, nil
+	meta.ImageURL = findMeta(doc, "og:image")
+	meta.Description = findMeta(doc, "og:description")
+	if meta.ImageURL == "" || meta.Description == "" {
+		return nil, errors.New("Meta is empty")
+	}
+	return &meta, nil
 }
 
 func translate(query, from, to string) (string, error) {
