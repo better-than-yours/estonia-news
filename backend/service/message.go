@@ -13,8 +13,12 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func renderMessageBlock(msg *Message, title, description string) string {
-	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=%q>%s</a>", title, description, msg.Link, strings.TrimSpace(msg.FeedTitle))
+func renderMessageBlock(msg *Message) string {
+	payAccessSign := ""
+	if msg.Paywall {
+		payAccessSign = "💰"
+	}
+	return fmt.Sprintf("<b>%s%s</b>\n\n%s\n\n<a href=%q>%s</a>", payAccessSign, msg.Title, msg.Description, msg.Link, strings.TrimSpace(msg.FeedTitle))
 }
 
 // FormatText return formated test
@@ -28,32 +32,31 @@ func FormatText(text string) string {
 	return text
 }
 
-func getText(ctx context.Context, msg *Message) (title, description string) {
+func getText(ctx context.Context, msg *Message) *Message {
 	provider := ctx.Value(config.CtxProviderKey).(*entity.Provider)
-	title = FormatText(msg.Title)
-	description = FormatText(msg.Description)
+	msg.Title = FormatText(msg.Title)
+	msg.Description = FormatText(msg.Description)
 	if provider.Lang == "EST" {
-		if title != "" {
-			text, err := translate(title, "et", "en")
+		if msg.Title != "" {
+			text, err := translate(msg.Title, "et", "en")
 			if err != nil {
 				misc.Fatal("get_translate", "get translate", err)
 			}
-			title = text
+			msg.Title = text
 		}
-		if description != "" {
-			text, err := translate(description, "et", "en")
+		if msg.Description != "" {
+			text, err := translate(msg.Description, "et", "en")
 			if err != nil {
 				misc.Fatal("get_translate", "get translate", err)
 			}
-			description = text
+			msg.Description = text
 		}
 	}
-	return
+	return msg
 }
 
 func createMessageObject(ctx context.Context, msg *Message) (tgbotapi.Chattable, error) {
-	title, description := getText(ctx, msg)
-	text := renderMessageBlock(msg, title, description)
+	text := renderMessageBlock(getText(ctx, msg))
 	chatID := ctx.Value(config.CtxChatIDKey).(int64)
 	var obj tgbotapi.Chattable
 	if msg.ImageURL == "" {
@@ -84,8 +87,7 @@ func createMessageObject(ctx context.Context, msg *Message) (tgbotapi.Chattable,
 }
 
 func editMessageObject(ctx context.Context, messageID int, msg *Message) *tgbotapi.EditMessageCaptionConfig {
-	title, description := getText(ctx, msg)
-	text := renderMessageBlock(msg, title, description)
+	text := renderMessageBlock(getText(ctx, msg))
 	chatID := ctx.Value(config.CtxChatIDKey).(int64)
 	return &tgbotapi.EditMessageCaptionConfig{
 		BaseEdit: tgbotapi.BaseEdit{
@@ -113,6 +115,7 @@ type Message struct {
 	Categories  []string
 	Link        string
 	ImageURL    string
+	Paywall     bool
 }
 
 // Add is add message
@@ -125,6 +128,7 @@ func Add(ctx context.Context, item *config.FeedItem) (tgbotapi.Chattable, error)
 		Categories:  item.Categories,
 		Link:        item.Link,
 		ImageURL:    item.ImageURL,
+		Paywall:     item.Paywall,
 	})
 	if err != nil {
 		misc.Fatal("get_message", "get message", err)
@@ -142,6 +146,7 @@ func Edit(ctx context.Context, item *config.FeedItem, entry entity.Entry) (*tgbo
 		Categories:  item.Categories,
 		Link:        item.Link,
 		ImageURL:    item.ImageURL,
+		Paywall:     item.Paywall,
 	})
 	return msg, nil
 }

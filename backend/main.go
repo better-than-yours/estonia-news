@@ -199,6 +199,7 @@ func addMissingEntries(ctx context.Context, items []*config.FeedItem) error {
 			misc.Error("parse_image_url", "parse image url", err)
 			continue
 		}
+		item.Paywall = meta.Paywall
 		item.ImageURL = meta.ImageURL
 		if item.Description == "" {
 			item.Description = meta.Description
