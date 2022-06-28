@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/lafin/http"
 	"github.com/mmcdole/gofeed"
@@ -59,6 +60,7 @@ func findMeta(node *html.Node, key string) string {
 type Meta struct {
 	ImageURL    string
 	Description string
+	Paywall     bool
 }
 
 // GetMeta return meta info by url
@@ -74,6 +76,7 @@ func GetMeta(link string) (*Meta, error) {
 	if meta.ImageURL == "" || meta.Description == "" {
 		return nil, errors.New("Meta is empty")
 	}
+	meta.Paywall = strings.Contains(string(body), `paywall-component="paywall"`)
 	return &meta, nil
 }
 

@@ -29,6 +29,7 @@ type FeedItem struct {
 	Published     string
 	Categories    []string
 	CategoriesIds []int
+	Paywall       bool
 }
 
 type ctxKey int
