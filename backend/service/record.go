@@ -35,6 +35,8 @@ func UpsertRecord(ctx context.Context, item *config.FeedItem, messageID int) err
 		Link:        item.Link,
 		Title:       item.Title,
 		Description: item.Description,
+		ImageURL:    item.ImageURL,
+		Paywall:     item.Paywall,
 		PublishedAt: pubDate,
 		UpdatedAt:   time.Now(),
 		MessageID:   messageID,

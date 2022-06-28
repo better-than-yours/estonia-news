@@ -28,10 +28,7 @@ import (
 )
 
 func hasChanges(item *config.FeedItem, entry entity.Entry) bool {
-	if entry.Title == item.Title && entry.Description == item.Description && entry.Link == item.Link {
-		return false
-	}
-	return true
+	return !(entry.Title == item.Title && entry.Description == item.Description && entry.Link == item.Link && entry.ImageURL == item.ImageURL && entry.Paywall == item.Paywall)
 }
 
 func checkRecord(ctx context.Context, item *config.FeedItem) error {

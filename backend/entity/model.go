@@ -14,6 +14,8 @@ type Entry struct {
 	Link        string
 	Title       string
 	Description string
+	ImageURL    string
+	Paywall     bool
 	MessageID   int
 	ProviderID  int
 	UpdatedAt   time.Time `bun:",nullzero,notnull,default:current_timestamp"`
