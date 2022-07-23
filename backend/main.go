@@ -150,7 +150,7 @@ func deleteDeletedEntries(ctx context.Context, items []*config.FeedItem) error {
 	return nil
 }
 
-func isValidItemByContent(ctx context.Context, blockedCategories, blockedWords []string, item *config.FeedItem) bool {
+func isValidItemByContent(blockedCategories, blockedWords []string, item *config.FeedItem) bool {
 	if len(funk.IntersectString(blockedCategories, item.Categories)) > 0 {
 		return false
 	}
@@ -278,13 +278,13 @@ func handleNews(ctx context.Context) {
 	}
 	ctx = context.WithValue(ctx, config.CtxChatIDKey, chatID)
 	go cleanUp(ctx)
-	job(ctx, chatID)
+	job(ctx)
 	ticker := time.NewTicker(config.TimeoutBetweenLoops)
 	quit := make(chan struct{})
 	for {
 		select {
 		case <-ticker.C:
-			job(ctx, chatID)
+			job(ctx)
 		case <-quit:
 			ticker.Stop()
 			return
@@ -292,7 +292,7 @@ func handleNews(ctx context.Context) {
 	}
 }
 
-func job(ctx context.Context, chatID int64) {
+func job(ctx context.Context) {
 	providers := getProviders(ctx)
 	for _, provider := range providers {
 		if provider.Lang != os.Getenv("LANG_NEWS") {
@@ -340,7 +340,7 @@ func job(ctx context.Context, chatID int64) {
 		}).([]*config.FeedItem)
 		items = funk.Filter(items, isValidItemByTerm).([]*config.FeedItem)
 		items = funk.Filter(items, func(item *config.FeedItem) bool {
-			return isValidItemByContent(ctx, blockedCategories, provider.BlockedWords, item)
+			return isValidItemByContent(blockedCategories, provider.BlockedWords, item)
 		}).([]*config.FeedItem)
 		sort.Slice(items, func(i, j int) bool {
 			return items[i].Published > items[j].Published
