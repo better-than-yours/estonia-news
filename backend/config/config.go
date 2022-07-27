@@ -11,7 +11,7 @@ var TimeoutBetweenLoops = 5 * time.Minute
 var TimeoutBetweenMessages = time.Second
 
 // TimeShift get messages from the last hours
-var TimeShift = 2 * time.Hour
+var TimeShift = 3 * time.Hour
 
 // PurgeOldEntriesEvery is time for purge old entries
 var PurgeOldEntriesEvery = time.Hour
