@@ -162,7 +162,7 @@ func isValidItemByContent(blockedCategories, blockedWords []string, item *config
 
 func isValidItemByTerm(item *config.FeedItem) bool {
 	pubDate, _ := time.Parse(time.RFC1123Z, item.Published)
-	return !pubDate.Add(config.TimeShift).Before(time.Now())
+	return pubDate.Add(config.TimeShift).After(time.Now())
 }
 
 func findSimilarRecord(ctx context.Context, item *config.FeedItem) (bool, error) {
