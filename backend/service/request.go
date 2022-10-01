@@ -76,7 +76,7 @@ func GetMeta(link string) (*Meta, error) {
 	if meta.ImageURL == "" || meta.Description == "" {
 		return nil, errors.New("Meta is empty")
 	}
-	meta.Paywall = funk.Contains([]string{`paywall-component="paywall"`, "C-fragment--teaser", `class="article-paywall-buttons-block__price"`}, func(feature string) bool {
+	meta.Paywall = funk.Contains([]string{"C-fragment--teaser", "article__label article__premium-flag"}, func(feature string) bool {
 		return strings.Contains(string(body), feature)
 	})
 	return &meta, nil
