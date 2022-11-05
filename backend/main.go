@@ -133,7 +133,7 @@ func deleteDeletedEntries(ctx context.Context, items []*config.FeedItem) error {
 		foundEntry := funk.Contains(items, func(item *config.FeedItem) bool {
 			return entry.ID == item.GUID
 		})
-		if !foundEntry {
+		if !foundEntry && service.IsLinkUnavailable(entry.Link) {
 			if err := service.Delete(ctx, entry); err != nil {
 				misc.Error("delete_message", fmt.Sprintf("delete message '%s'", entry.ID), err)
 				if !strings.Contains(err.Error(), "message to delete not found") {
