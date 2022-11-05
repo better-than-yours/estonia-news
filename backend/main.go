@@ -319,11 +319,13 @@ func job(ctx context.Context) {
 			misc.Fatal("add_missed_categories", "add missed categories", err)
 		}
 		items := funk.Map(feed.Items, func(item *gofeed.Item) *config.FeedItem {
-			var guid string
+			path := item.Link
 			if len(item.GUID) > 0 {
-				guid = misc.FormatGUID(item.GUID)
-			} else {
-				guid = misc.FormatGUID(item.Link)
+				path = item.GUID
+			}
+			guid, err := misc.FormatGUID(path)
+			if err != nil {
+				misc.Fatal("format_guid", "format guid", err)
 			}
 			categoriesIds := funk.Map(item.Categories, func(category string) int {
 				return categoriesMap[category]

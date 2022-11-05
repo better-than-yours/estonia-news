@@ -1,6 +1,7 @@
 package misc
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -34,19 +35,20 @@ func PushMetrics() {
 }
 
 // FormatGUID return formated GUID
-func FormatGUID(path string) string {
+func FormatGUID(path string) (string, error) {
 	var r *regexp.Regexp
 	r = regexp.MustCompile(`^\w+#\d+$`)
 	if r.MatchString(path) {
-		return path
+		return path, nil
 	}
 	r = regexp.MustCompile(`err.*?/(\d+)$`)
 	if r.MatchString(path) {
-		return fmt.Sprintf("err#%s", r.FindStringSubmatch(path)[1])
+		return fmt.Sprintf("err#%s", r.FindStringSubmatch(path)[1]), nil
 	}
 	r = regexp.MustCompile(`delfi.*?/(\d+)/.*?$`)
 	if r.MatchString(path) {
-		return fmt.Sprintf("delfi#%s", r.FindStringSubmatch(path)[1])
+		return fmt.Sprintf("delfi#%s", r.FindStringSubmatch(path)[1]), nil
 	}
-	return ""
+	return "", errors.New("empty GUID")
+
 }
