@@ -125,7 +125,7 @@ func deleteDeletedEntries(ctx context.Context, items []*config.FeedItem) error {
 	dbConnect := ctx.Value(config.CtxDBKey).(*bun.DB)
 	provider := ctx.Value(config.CtxProviderKey).(*entity.Provider)
 	var entries []entity.Entry
-	err := dbConnect.NewSelect().Model(&entries).Where(fmt.Sprintf("published_at > NOW() - INTERVAL '%d hours' AND provider_id = %d", config.TimeShift/time.Hour, provider.ID)).Scan(ctx)
+	err := dbConnect.NewSelect().Model(&entries).Where(fmt.Sprintf("updated_at > NOW() - INTERVAL '%d hours' AND provider_id = %d", config.TimeShift/time.Hour, provider.ID)).Scan(ctx)
 	if err != nil {
 		misc.Fatal("query_entries", "query entries", err)
 	}
