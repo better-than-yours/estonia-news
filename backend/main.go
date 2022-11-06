@@ -51,7 +51,7 @@ func checkRecord(ctx context.Context, item *config.FeedItem) error {
 }
 
 func editMessage(ctx context.Context, item *config.FeedItem, entry entity.Entry) error {
-	misc.L.Logf("INFO send edit message '%s'", entry.ID)
+	misc.Info(fmt.Sprintf("send edit message '%s'", entry.ID))
 	msg, err := service.Edit(ctx, item, entry)
 	if err != nil {
 		if strings.Contains(err.Error(), "message to edit not found") {
@@ -75,7 +75,7 @@ func editMessage(ctx context.Context, item *config.FeedItem, entry entity.Entry)
 }
 
 func newMessage(ctx context.Context, item *config.FeedItem) error {
-	misc.L.Logf("INFO send message '%s'", item.GUID)
+	misc.Info(fmt.Sprintf("send message '%s'", item.GUID))
 	msg, err := service.Add(ctx, item)
 	if err != nil {
 		return err
@@ -133,7 +133,11 @@ func deleteDeletedEntries(ctx context.Context, items []*config.FeedItem) error {
 		foundEntry := funk.Contains(items, func(item *config.FeedItem) bool {
 			return entry.ID == item.GUID
 		})
-		if !foundEntry && service.IsLinkUnavailable(entry.Link) {
+		linkUnavailable := service.IsLinkUnavailable(entry.Link)
+		if !foundEntry && !linkUnavailable {
+			misc.Info(fmt.Sprintf("received feed without entry '%s'", entry.ID))
+		}
+		if !foundEntry && linkUnavailable {
 			if err := service.Delete(ctx, entry); err != nil {
 				misc.Error("delete_message", fmt.Sprintf("delete message '%s'", entry.ID), err)
 				if !strings.Contains(err.Error(), "message to delete not found") {
@@ -247,7 +251,7 @@ func main() {
 	bot := telegram.Connect(os.Getenv("TELEGRAM_TOKEN"))
 	ctx = context.WithValue(ctx, config.CtxBotKey, bot)
 	bot.Debug = os.Getenv("DEBUG") == "true"
-	misc.L.Logf("INFO authorized on account '%s'", bot.Self.UserName)
+	misc.Info(fmt.Sprintf("authorized on account '%s'", bot.Self.UserName))
 	commander := os.Getenv("COMMANDER")
 	go pushMetrics()
 	if len(commander) > 0 {

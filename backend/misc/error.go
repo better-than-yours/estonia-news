@@ -22,3 +22,10 @@ func Error(name, desc string, err error) {
 		L.Logf("ERROR %s, %v", desc, err)
 	}
 }
+
+// Info expose info
+func Info(desc string) {
+	if flag.Lookup("test.v") == nil {
+		L.Logf("INFO %s", desc)
+	}
+}
