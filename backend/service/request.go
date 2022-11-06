@@ -32,5 +32,5 @@ func getImage(imageURL string) ([]byte, error) {
 // IsLinkUnavailable return availability of link
 func IsLinkUnavailable(link string) bool {
 	body, res, _ := http.Get(link, nil)
-	return res.StatusCode == 404 || strings.Contains(string(body), "Artiklit ei leitud")
+	return res != nil && (res.StatusCode == 404 || res.StatusCode == 200 && strings.Contains(string(body), "Artiklit ei leitud"))
 }
