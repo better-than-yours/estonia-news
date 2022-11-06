@@ -9,7 +9,7 @@ require (
 	github.com/lafin/http v0.0.4
 	github.com/lib/pq v1.10.5
 	github.com/mmcdole/gofeed v1.1.3
-	github.com/prometheus/client_golang v1.13.0
+	github.com/prometheus/client_golang v1.13.1
 	github.com/stretchr/testify v1.7.1
 	github.com/thoas/go-funk v0.9.2
 	github.com/uptrace/bun v1.1.8
