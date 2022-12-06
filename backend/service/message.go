@@ -13,16 +13,23 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func renderMessageBlock(msg *Message) string {
-	payAccessSign := ""
+func formatText(ctx context.Context, msg *Message) string {
+	provider := ctx.Value(config.CtxProviderKey).(*entity.Provider)
+	title := msg.Title
+	link := msg.Link
 	if msg.Paywall {
-		payAccessSign = "💰"
+		if provider.Name == "Delfi" {
+			title = "🆓" + title
+			link = strings.Replace(link, "delfi.ee", "delfi.pub", 1)
+		} else {
+			title = "💰" + title
+		}
 	}
-	return fmt.Sprintf("<b>%s%s</b>\n\n%s\n\n<a href=%q>%s</a>", payAccessSign, msg.Title, msg.Description, msg.Link, strings.TrimSpace(msg.FeedTitle))
+	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=%q>%s</a>", title, msg.Description, link, provider.Name)
 }
 
-// FormatText return formated test
-func FormatText(text string) string {
+// CleanUpText return formated test
+func CleanUpText(text string) string {
 	text = regexp.MustCompile(`<img.*?/>`).ReplaceAllString(text, "")
 	text = regexp.MustCompile(`([\x{0020}\x{00a0}\x{1680}\x{180e}\x{2000}-\x{200b}\x{202f}\x{205f}\x{3000}\x{feff}])`).ReplaceAllString(text, " ")
 	text = regexp.MustCompile(`\n+\s+`).ReplaceAllString(text, "\n")
@@ -32,10 +39,10 @@ func FormatText(text string) string {
 	return text
 }
 
-func getText(ctx context.Context, msg *Message) *Message {
+func getText(ctx context.Context, msg *Message) string {
 	provider := ctx.Value(config.CtxProviderKey).(*entity.Provider)
-	msg.Title = FormatText(msg.Title)
-	msg.Description = FormatText(msg.Description)
+	msg.Title = CleanUpText(msg.Title)
+	msg.Description = CleanUpText(msg.Description)
 	if provider.Lang == "EST" {
 		if msg.Title != "" {
 			text, err := translate(msg.Title, "et", "en")
@@ -52,11 +59,11 @@ func getText(ctx context.Context, msg *Message) *Message {
 			msg.Description = text
 		}
 	}
-	return msg
+	return formatText(ctx, msg)
 }
 
 func createMessageObject(ctx context.Context, msg *Message) (tgbotapi.Chattable, error) {
-	text := renderMessageBlock(getText(ctx, msg))
+	text := getText(ctx, msg)
 	chatID := ctx.Value(config.CtxChatIDKey).(int64)
 	var obj tgbotapi.Chattable
 	if msg.ImageURL == "" {
@@ -87,7 +94,7 @@ func createMessageObject(ctx context.Context, msg *Message) (tgbotapi.Chattable,
 }
 
 func editMessageObject(ctx context.Context, messageID int, msg *Message) *tgbotapi.EditMessageCaptionConfig {
-	text := renderMessageBlock(getText(ctx, msg))
+	text := getText(ctx, msg)
 	chatID := ctx.Value(config.CtxChatIDKey).(int64)
 	return &tgbotapi.EditMessageCaptionConfig{
 		BaseEdit: tgbotapi.BaseEdit{
