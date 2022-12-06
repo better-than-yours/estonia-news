@@ -16,16 +16,14 @@ import (
 func formatText(ctx context.Context, msg *Message) string {
 	provider := ctx.Value(config.CtxProviderKey).(*entity.Provider)
 	title := msg.Title
-	link := msg.Link
 	if msg.Paywall {
 		if provider.Name == "Delfi" {
 			title = "🆓" + title
-			link = strings.Replace(link, "delfi.ee", "delfi.pub", 1)
 		} else {
 			title = "💰" + title
 		}
 	}
-	return fmt.Sprintf("<b>%s</b>\n\n%s\n\n<a href=%q>%s</a>", title, msg.Description, link, provider.Name)
+	return fmt.Sprintf("<b>%s</b>\n\n%s", title, msg.Description)
 }
 
 // CleanUpText return formated test
@@ -62,13 +60,24 @@ func getText(ctx context.Context, msg *Message) string {
 	return formatText(ctx, msg)
 }
 
+func getButton(ctx context.Context, msg *Message) *tgbotapi.InlineKeyboardMarkup {
+	provider := ctx.Value(config.CtxProviderKey).(*entity.Provider)
+	link := msg.Link
+	if msg.Paywall && provider.Name == "Delfi" {
+		link = strings.Replace(link, "delfi.ee", "delfi.pub", 1)
+	}
+	button := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonURL(fmt.Sprintf("Read on %s", provider.Name), link)))
+	return &button
+}
+
 func createMessageObject(ctx context.Context, msg *Message) (tgbotapi.Chattable, error) {
 	text := getText(ctx, msg)
+	button := getButton(ctx, msg)
 	chatID := ctx.Value(config.CtxChatIDKey).(int64)
 	var obj tgbotapi.Chattable
 	if msg.ImageURL == "" {
 		obj = tgbotapi.MessageConfig{
-			BaseChat:              tgbotapi.BaseChat{ChatID: chatID},
+			BaseChat:              tgbotapi.BaseChat{ChatID: chatID, ReplyMarkup: button},
 			Text:                  text,
 			ParseMode:             tgbotapi.ModeHTML,
 			DisableWebPagePreview: true,
@@ -82,7 +91,7 @@ func createMessageObject(ctx context.Context, msg *Message) (tgbotapi.Chattable,
 		chatID := ctx.Value(config.CtxChatIDKey).(int64)
 		obj = tgbotapi.PhotoConfig{
 			BaseFile: tgbotapi.BaseFile{
-				BaseChat: tgbotapi.BaseChat{ChatID: chatID},
+				BaseChat: tgbotapi.BaseChat{ChatID: chatID, ReplyMarkup: button},
 				File:     file,
 			},
 			Caption:   text,
@@ -95,11 +104,13 @@ func createMessageObject(ctx context.Context, msg *Message) (tgbotapi.Chattable,
 
 func editMessageObject(ctx context.Context, messageID int, msg *Message) *tgbotapi.EditMessageCaptionConfig {
 	text := getText(ctx, msg)
+	button := getButton(ctx, msg)
 	chatID := ctx.Value(config.CtxChatIDKey).(int64)
 	return &tgbotapi.EditMessageCaptionConfig{
 		BaseEdit: tgbotapi.BaseEdit{
-			ChatID:    chatID,
-			MessageID: messageID,
+			ChatID:      chatID,
+			MessageID:   messageID,
+			ReplyMarkup: button,
 		},
 		Caption:   text,
 		ParseMode: tgbotapi.ModeHTML,
