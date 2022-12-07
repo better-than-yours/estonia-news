@@ -13,17 +13,8 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func formatText(ctx context.Context, msg *Message) string {
-	provider := ctx.Value(config.CtxProviderKey).(*entity.Provider)
-	title := msg.Title
-	if msg.Paywall {
-		if provider.Name == "Delfi" {
-			title = "🆓" + title
-		} else {
-			title = "💰" + title
-		}
-	}
-	return fmt.Sprintf("<b>%s</b>\n\n%s", title, msg.Description)
+func formatText(msg *Message) string {
+	return fmt.Sprintf("<b>%s</b>\n\n%s", msg.Title, msg.Description)
 }
 
 // CleanUpText return formated test
@@ -57,16 +48,23 @@ func getText(ctx context.Context, msg *Message) string {
 			msg.Description = text
 		}
 	}
-	return formatText(ctx, msg)
+	return formatText(msg)
 }
 
 func getButton(ctx context.Context, msg *Message) *tgbotapi.InlineKeyboardMarkup {
 	provider := ctx.Value(config.CtxProviderKey).(*entity.Provider)
 	link := msg.Link
-	if msg.Paywall && provider.Name == "Delfi" {
-		link = strings.Replace(link, "delfi.ee", "delfi.pub", 1)
+	name := fmt.Sprintf("Read on %s", provider.Name)
+	isDelfi := provider.Name == "Delfi"
+	if msg.Paywall {
+		if isDelfi {
+			name = "🆓" + name
+			link = regexp.MustCompile(`(^https*://).*delfi\.ee(.*$)`).ReplaceAllString(link, "${1}delfi.pub${2}")
+		} else {
+			name = "💰" + name
+		}
 	}
-	button := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonURL(fmt.Sprintf("Read on %s", provider.Name), link)))
+	button := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonURL(name, link)))
 	return &button
 }
 
