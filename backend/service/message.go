@@ -55,14 +55,8 @@ func getButton(ctx context.Context, msg *Message) *tgbotapi.InlineKeyboardMarkup
 	provider := ctx.Value(config.CtxProviderKey).(*entity.Provider)
 	link := msg.Link
 	name := fmt.Sprintf("Read on %s", provider.Name)
-	isDelfi := provider.Name == "Delfi"
 	if msg.Paywall {
-		if isDelfi {
-			name = "🆓" + name
-			link = regexp.MustCompile(`(^https*://).*delfi\.ee(.*$)`).ReplaceAllString(link, "${1}delfi.pub${2}")
-		} else {
-			name = "💰" + name
-		}
+		name = "💰" + name
 	}
 	button := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonURL(name, link)))
 	return &button
