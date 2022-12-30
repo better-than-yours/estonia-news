@@ -30,9 +30,10 @@ func CleanUpText(text string) string {
 
 func getText(ctx context.Context, msg *Message) string {
 	provider := ctx.Value(config.CtxProviderKey).(*entity.Provider)
+	translateLang := ctx.Value(config.CtxTranslateLangKey).(string)
 	msg.Title = CleanUpText(msg.Title)
 	msg.Description = CleanUpText(msg.Description)
-	if provider.Lang == "EST" {
+	if provider.Lang == "EST" && translateLang == "ENG" {
 		if msg.Title != "" {
 			text, err := translate(msg.Title, "et", "en")
 			if err != nil {

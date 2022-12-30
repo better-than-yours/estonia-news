@@ -299,7 +299,7 @@ func handleNews(ctx context.Context) {
 func job(ctx context.Context) {
 	providers := getProviders(ctx)
 	for _, provider := range providers {
-		if provider.Lang != os.Getenv("LANG_NEWS") {
+		if provider.Lang != os.Getenv("SOURCE_LANG") {
 			continue
 		}
 		feed, err := service.GetFeed(provider.URL)
@@ -308,6 +308,7 @@ func job(ctx context.Context) {
 		}
 		ctx = context.WithValue(ctx, config.CtxProviderKey, &provider) //nolint:gosec,gocritic
 		ctx = context.WithValue(ctx, config.CtxFeedTitleKey, feed.Title)
+		ctx = context.WithValue(ctx, config.CtxTranslateLangKey, os.Getenv("TRANSLATE_LANG"))
 		blocks, err := entity.GetListBlocks(ctx)
 		if err != nil {
 			misc.Fatal("get_blocked_categories", "get blocked categories", err)

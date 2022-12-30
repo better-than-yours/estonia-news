@@ -45,4 +45,6 @@ const (
 	CtxChatIDKey
 	// CtxFeedTitleKey is ctx feed title key
 	CtxFeedTitleKey
+	// CtxTranslateLangKey is ctx translate lang key
+	CtxTranslateLangKey
 )
