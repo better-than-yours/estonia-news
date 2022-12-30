@@ -3,6 +3,7 @@ package entity
 import (
 	"context"
 	"estonia-news/config"
+	"fmt"
 
 	"github.com/uptrace/bun"
 )
@@ -11,7 +12,7 @@ import (
 func GetEntryByID(ctx context.Context, entryID string) (*Entry, error) {
 	dbConnect := ctx.Value(config.CtxDBKey).(*bun.DB)
 	var entry Entry
-	err := dbConnect.NewSelect().Model(&entry).Relation("Categories.Category").Where("id = ?", entryID).Scan(ctx)
+	err := dbConnect.NewSelect().Model(&entry).Relation("Categories.Category").Where("id LIKE ?", fmt.Sprintf("%s%s%s", "%", entryID, "%")).Scan(ctx)
 	if err != nil {
 		return nil, err
 	}
