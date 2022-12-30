@@ -323,6 +323,7 @@ func job(ctx context.Context) {
 		if err != nil {
 			misc.Fatal("add_missed_categories", "add missed categories", err)
 		}
+		chatID := ctx.Value(config.CtxChatIDKey).(int64)
 		items := funk.Map(feed.Items, func(item *gofeed.Item) *config.FeedItem {
 			path := item.Link
 			if len(item.GUID) > 0 {
@@ -336,7 +337,7 @@ func job(ctx context.Context) {
 				return categoriesMap[category]
 			}).([]int)
 			return &config.FeedItem{
-				GUID:          guid,
+				GUID:          fmt.Sprintf("%s%d", guid, chatID),
 				Link:          item.Link,
 				Title:         item.Title,
 				Description:   item.Description,

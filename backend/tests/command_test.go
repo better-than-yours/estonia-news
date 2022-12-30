@@ -8,7 +8,7 @@ import (
 
 func (t *SuiteTest) Test_Command_GetEntryByID() {
 	LoadFixtures(t)
-	res, err := entity.GetEntryByID(t.ctx, "err#123")
+	res, err := entity.GetEntryByID(t.ctx, "err#123-1000000000000")
 	if assert.NoError(t.T(), err) {
 		var categories []entity.Category
 		_ = t.db.NewSelect().Model(&categories).Scan(t.ctx)
@@ -17,7 +17,7 @@ func (t *SuiteTest) Test_Command_GetEntryByID() {
 		assert.Equal(t.T(), "cat1", res.Categories[0].Category.Name)
 		assert.Equal(t.T(), categories[1].ID, res.Categories[1].CategoryID)
 		assert.Equal(t.T(), "cat2", res.Categories[1].Category.Name)
-		assert.Equal(t.T(), "err#123", res.ID)
+		assert.Equal(t.T(), "err#123-1000000000000", res.ID)
 	}
 }
 

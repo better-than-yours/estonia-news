@@ -13,26 +13,26 @@ import (
 
 func (t *SuiteTest) Test_Record_DeleteRecord() {
 	LoadFixtures(t)
-	err := service.DeleteRecord(t.ctx, entity.Entry{ID: "err#123"})
+	err := service.DeleteRecord(t.ctx, entity.Entry{ID: "err#123-1000000000000"})
 	if assert.NoError(t.T(), err) {
 		var entries []entity.Entry
 		err := t.db.NewSelect().Model(&entries).Scan(t.ctx)
 		assert.NoError(t.T(), err)
 		assert.EqualValues(t.T(), 1, len(entries))
-		assert.Equal(t.T(), "err#321", entries[0].ID)
+		assert.Equal(t.T(), "err#321-1000000000000", entries[0].ID)
 
 		var entryToCategories []entity.EntryToCategory
 		err = t.db.NewSelect().Model(&entryToCategories).Scan(t.ctx)
 		assert.NoError(t.T(), err)
 		assert.EqualValues(t.T(), 1, len(entryToCategories))
-		assert.Equal(t.T(), "err#321", entryToCategories[0].EntryID)
+		assert.Equal(t.T(), "err#321-1000000000000", entryToCategories[0].EntryID)
 	}
 }
 
 func (t *SuiteTest) Test_Record_UpsertRecord_Create() {
 	LoadFixtures(t)
 	err := service.UpsertRecord(t.ctx, &config.FeedItem{
-		GUID:        "pm#123",
+		GUID:        "pm#123-1000000000000",
 		Published:   "Mon, 02 Jan 2006 15:04:05 -0700",
 		Link:        "link",
 		Title:       "title",
@@ -44,7 +44,7 @@ func (t *SuiteTest) Test_Record_UpsertRecord_Create() {
 		err = t.db.NewSelect().Model(&entries).Scan(t.ctx)
 		assert.EqualValues(t.T(), 3, len(entries))
 		assert.NoError(t.T(), err)
-		assert.Equal(t.T(), "pm#123", entries[2].ID)
+		assert.Equal(t.T(), "pm#123-1000000000000", entries[2].ID)
 
 		var categories []entity.Category
 		err = t.db.NewSelect().Model(&categories).Scan(t.ctx)
@@ -58,18 +58,18 @@ func (t *SuiteTest) Test_Record_UpsertRecord_Create() {
 		err = t.db.NewSelect().Model(&entryToCategories).Scan(t.ctx)
 		assert.EqualValues(t.T(), 5, len(entryToCategories))
 		assert.NoError(t.T(), err)
-		assert.Equal(t.T(), "err#123", entryToCategories[0].EntryID)
-		assert.Equal(t.T(), "err#123", entryToCategories[1].EntryID)
-		assert.Equal(t.T(), "err#321", entryToCategories[2].EntryID)
-		assert.Equal(t.T(), "pm#123", entryToCategories[3].EntryID)
-		assert.Equal(t.T(), "pm#123", entryToCategories[4].EntryID)
+		assert.Equal(t.T(), "err#123-1000000000000", entryToCategories[0].EntryID)
+		assert.Equal(t.T(), "err#123-1000000000000", entryToCategories[1].EntryID)
+		assert.Equal(t.T(), "err#321-1000000000000", entryToCategories[2].EntryID)
+		assert.Equal(t.T(), "pm#123-1000000000000", entryToCategories[3].EntryID)
+		assert.Equal(t.T(), "pm#123-1000000000000", entryToCategories[4].EntryID)
 	}
 }
 
 func (t *SuiteTest) Test_Record_UpsertRecord_Update() {
 	LoadFixtures(t)
 	err := service.UpsertRecord(t.ctx, &config.FeedItem{
-		GUID:        "pm#123",
+		GUID:        "pm#123-1000000000000",
 		Published:   "Mon, 02 Jan 2006 15:04:05 -0700",
 		Link:        "link",
 		Title:       "title",
@@ -78,7 +78,7 @@ func (t *SuiteTest) Test_Record_UpsertRecord_Update() {
 	}, 123)
 	assert.NoError(t.T(), err)
 	err = service.UpsertRecord(t.ctx, &config.FeedItem{
-		GUID:       "pm#123",
+		GUID:       "pm#123-1000000000000",
 		Link:       "link_new",
 		Published:  "Mon, 02 Jan 2006 15:04:05 -0700",
 		Title:      "title",
@@ -89,7 +89,7 @@ func (t *SuiteTest) Test_Record_UpsertRecord_Update() {
 		err = t.db.NewSelect().Model(&entries).Scan(t.ctx)
 		assert.EqualValues(t.T(), 3, len(entries))
 		assert.NoError(t.T(), err)
-		assert.Equal(t.T(), "pm#123", entries[2].ID)
+		assert.Equal(t.T(), "pm#123-1000000000000", entries[2].ID)
 		assert.Equal(t.T(), "link_new", entries[2].Link)
 		assert.Equal(t.T(), "title", entries[2].Title)
 
@@ -105,8 +105,8 @@ func (t *SuiteTest) Test_Record_UpsertRecord_Update() {
 		err = t.db.NewSelect().Model(&entryToCategories).Relation("Category").Scan(t.ctx)
 		assert.EqualValues(t.T(), 5, len(entryToCategories))
 		assert.NoError(t.T(), err)
-		assert.Equal(t.T(), "pm#123", entryToCategories[3].EntryID)
-		assert.Equal(t.T(), "pm#123", entryToCategories[4].EntryID)
+		assert.Equal(t.T(), "pm#123-1000000000000", entryToCategories[3].EntryID)
+		assert.Equal(t.T(), "pm#123-1000000000000", entryToCategories[4].EntryID)
 		assert.Equal(t.T(), "cat1", entryToCategories[3].Category.Name)
 		assert.Equal(t.T(), "cat2", entryToCategories[4].Category.Name)
 	}

@@ -77,7 +77,7 @@ func LoadFixtures(t *SuiteTest) {
 	if err != nil {
 		fmt.Printf("%v", err)
 	}
-	entry := []entity.Entry{{ID: "err#123", ProviderID: providers[0].ID, PublishedAt: time.Now(), UpdatedAt: time.Now()}, {ID: "err#321", ProviderID: providers[0].ID, PublishedAt: time.Now(), UpdatedAt: time.Now()}}
+	entry := []entity.Entry{{ID: "err#123-1000000000000", ProviderID: providers[0].ID, PublishedAt: time.Now(), UpdatedAt: time.Now()}, {ID: "err#321-1000000000000", ProviderID: providers[0].ID, PublishedAt: time.Now(), UpdatedAt: time.Now()}}
 	_, err = t.db.NewInsert().Model(&entry).Exec(t.ctx)
 	if err != nil {
 		fmt.Printf("%v", err)
@@ -98,4 +98,5 @@ func LoadFixtures(t *SuiteTest) {
 		fmt.Printf("%v", err)
 	}
 	t.ctx = context.WithValue(t.ctx, config.CtxProviderKey, &providers[0])
+	t.ctx = context.WithValue(t.ctx, config.CtxChatIDKey, int64(-1000000000000))
 }
