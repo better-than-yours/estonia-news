@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"estonia-news/config"
 	"estonia-news/entity"
 
@@ -20,17 +22,19 @@ func AddMissedCategories(ctx context.Context, items []*gofeed.Item) (map[string]
 	categories = funk.Uniq(categories).([]string)
 	categoriesMap := make(map[string]int)
 	for _, categoryName := range categories {
-		category := entity.Category{
-			Name:       categoryName,
-			ProviderID: provider.ID,
-		}
-		_, err := dbConnect.NewInsert().Model(&category).On("CONFLICT (name, provider_id) DO NOTHING").Exec(ctx)
+		var category entity.Category
+		err := dbConnect.NewSelect().Model(&category).Where("name = ? AND provider_id = ?", categoryName, provider.ID).Limit(1).Scan(ctx)
 		if err != nil {
-			return nil, err
-		}
-		if category.ID == 0 {
-			err = dbConnect.NewSelect().Model(&category).Where("name = ? AND provider_id = ?", categoryName, provider.ID).Scan(ctx)
-			if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				category = entity.Category{
+					Name:       categoryName,
+					ProviderID: provider.ID,
+				}
+				_, err = dbConnect.NewInsert().Model(&category).On("CONFLICT (name, provider_id) DO NOTHING").Exec(ctx)
+				if err != nil {
+					return nil, err
+				}
+			} else {
 				return nil, err
 			}
 		}
