@@ -29,11 +29,12 @@ type Entry struct {
 type Provider struct {
 	bun.BaseModel `bun:"table:providers,alias:p"`
 
-	ID           int `bun:",pk,autoincrement"`
-	Name         string
-	URL          string
-	Lang         string
-	BlockedWords []string `bun:",array"`
+	ID             int `bun:",pk,autoincrement"`
+	Name           string
+	URL            string
+	Lang           string
+	BlockedWords   []string `bun:",array"`
+	BlockedDomains []string `bun:",array"`
 }
 
 // Category is a category structure
