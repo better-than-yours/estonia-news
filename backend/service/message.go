@@ -55,7 +55,14 @@ func getText(ctx context.Context, msg *Message) string {
 func getButton(ctx context.Context, msg *Message) *tgbotapi.InlineKeyboardMarkup {
 	provider := ctx.Value(config.CtxProviderKey).(*entity.Provider)
 	link := msg.Link
-	name := fmt.Sprintf("Read on %s", provider.Name)
+	readOnText := "Read on"
+	switch provider.Lang {
+	case "EST":
+		readOnText = "Loe edasi"
+	case "RUS":
+		readOnText = "Читать на"
+	}
+	name := fmt.Sprintf("%s %s", readOnText, provider.Name)
 	if msg.Paywall {
 		name = "💰" + name
 	}
