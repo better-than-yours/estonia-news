@@ -336,7 +336,7 @@ func job(ctx context.Context) {
 			}
 			guid, err := misc.FormatGUID(path)
 			if err != nil {
-				misc.Fatal("format_guid", "format guid", err)
+				misc.Fatal("format_guid", fmt.Sprintf("format guid for path '%s'", path), err)
 			}
 			categoriesIds := funk.Map(item.Categories, func(category string) int {
 				return categoriesMap[category]
