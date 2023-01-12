@@ -49,6 +49,10 @@ func FormatGUID(path string) (string, error) {
 	if r.MatchString(path) {
 		return fmt.Sprintf("delfi#%s", r.FindStringSubmatch(path)[1]), nil
 	}
+	r = regexp.MustCompile(`delfi.*?id=(\d+)$`)
+	if r.MatchString(path) {
+		return fmt.Sprintf("delfi#%s", r.FindStringSubmatch(path)[1]), nil
+	}
 	return "", errors.New("empty GUID")
 
 }
