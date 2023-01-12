@@ -134,9 +134,6 @@ func deleteDeletedEntries(ctx context.Context, items []*config.FeedItem) error {
 			return entry.ID == item.GUID
 		})
 		linkUnavailable := service.IsLinkUnavailable(entry.Link)
-		if !foundEntry && !linkUnavailable {
-			misc.Info(fmt.Sprintf("received feed without entry '%s'", entry.ID))
-		}
 		if !foundEntry && linkUnavailable {
 			if err := service.Delete(ctx, entry); err != nil {
 				misc.Error("delete_message", fmt.Sprintf("delete message '%s'", entry.ID), err)
