@@ -12,9 +12,9 @@ require (
 	github.com/prometheus/client_golang v1.14.0
 	github.com/stretchr/testify v1.8.1
 	github.com/thoas/go-funk v0.9.3
-	github.com/uptrace/bun v1.1.9
-	github.com/uptrace/bun/dialect/pgdialect v1.1.9
-	github.com/uptrace/bun/driver/pgdriver v1.1.9
+	github.com/uptrace/bun v1.1.10
+	github.com/uptrace/bun/dialect/pgdialect v1.1.10
+	github.com/uptrace/bun/driver/pgdriver v1.1.10
 	golang.org/x/net v0.5.0
 )
 
