@@ -5,16 +5,16 @@ go 1.18
 require (
 	github.com/go-pkgz/lgr v0.10.4
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
-	github.com/joho/godotenv v1.4.0
+	github.com/joho/godotenv v1.5.0
 	github.com/lafin/http v0.0.5
 	github.com/lib/pq v1.10.5
-	github.com/mmcdole/gofeed v1.1.3
+	github.com/mmcdole/gofeed v1.2.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/stretchr/testify v1.8.1
 	github.com/thoas/go-funk v0.9.3
-	github.com/uptrace/bun v1.1.10
-	github.com/uptrace/bun/dialect/pgdialect v1.1.10
-	github.com/uptrace/bun/driver/pgdriver v1.1.10
+	github.com/uptrace/bun v1.1.11
+	github.com/uptrace/bun/dialect/pgdialect v1.1.11
+	github.com/uptrace/bun/driver/pgdriver v1.1.11
 	golang.org/x/net v0.5.0
 )
 
