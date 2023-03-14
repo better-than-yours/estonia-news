@@ -20,8 +20,6 @@ jobs:
         branch: "update_deps"
         title: "feat: bump deps"
         labels: automated pr
-        assignees: lafin
-        reviewers: lafin
         team-reviewers: |
           owners
           maintainers
