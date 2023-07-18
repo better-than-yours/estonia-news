@@ -40,7 +40,7 @@ jobs:
           go test -timeout=60s -race -covermode atomic -coverprofile=covprofile -coverpkg=./... ./tests
       - name: Submit coverage
         run: |
-          go get -u -v github.com/mattn/goveralls
+          go install github.com/mattn/goveralls@latest
           $(go env GOPATH)/bin/goveralls -service="github" -coverprofile=${{ github.workspace }}/profile.cov
         env:
           COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
