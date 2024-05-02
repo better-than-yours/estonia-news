@@ -65,7 +65,7 @@ func ExecCommand(ctx context.Context, message *tgbotapi.Message) {
 	default:
 		return
 	}
-	if len(msg.Text) > 0 {
+	if msg.Text != "" {
 		bot := ctx.Value(config.CtxBotKey).(*tgbotapi.BotAPI)
 		_, err := bot.Send(msg)
 		if err != nil {

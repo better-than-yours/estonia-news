@@ -256,7 +256,7 @@ func main() {
 	misc.Info(fmt.Sprintf("authorized on account '%s'", bot.Self.UserName))
 	commander := os.Getenv("COMMANDER")
 	go pushMetrics()
-	if len(commander) > 0 {
+	if commander != "" {
 		db.Migrate(ctx)
 		handleCommand(ctx, commander)
 	} else {
@@ -328,14 +328,14 @@ func job(ctx context.Context) {
 		chatID := ctx.Value(config.CtxChatIDKey).(int64)
 		items := funk.Map(feed.Items, func(item *gofeed.Item) *config.FeedItem {
 			path := item.Link
-			if len(item.GUID) > 0 {
+			if item.GUID != "" {
 				path = item.GUID
 			}
 			guid, err := misc.FormatGUID(path)
 			if err != nil {
 				misc.Fatal("format_guid", fmt.Sprintf("format guid for path '%s'", path), err)
 			}
-			categoriesIds := funk.Map(item.Categories, func(category string) int {
+			categoriesIDs := funk.Map(item.Categories, func(category string) int {
 				return categoriesMap[category]
 			}).([]int)
 			return &config.FeedItem{
@@ -345,7 +345,7 @@ func job(ctx context.Context) {
 				Description:   item.Description,
 				Categories:    item.Categories,
 				Published:     item.Published,
-				CategoriesIds: categoriesIds,
+				CategoriesIDs: categoriesIDs,
 			}
 		}).([]*config.FeedItem)
 		items = funk.Filter(items, isValidItemByTerm).([]*config.FeedItem)

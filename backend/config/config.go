@@ -28,7 +28,7 @@ type FeedItem struct {
 	Description   string
 	Published     string
 	Categories    []string
-	CategoriesIds []int
+	CategoriesIDs []int
 	Paywall       bool
 }
 
