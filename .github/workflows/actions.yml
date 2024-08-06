@@ -23,9 +23,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
-      - uses: golangci/golangci-lint-action@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+      - uses: golangci/golangci-lint-action@v6
         with:
           version: latest
           working-directory: backend
@@ -57,7 +57,7 @@ jobs:
           - { arch: arm64,  goarch: arm64,  goarm: "" }
           - { arch: armv7,  goarch: arm,    goarm: 7 }
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set env variables
         run: |
           echo "REPOSITORY=ghcr.io/${REPOSITORY:-$GITHUB_REPOSITORY}-api" >> $GITHUB_ENV
@@ -79,7 +79,7 @@ jobs:
       DOCKER_CLI_EXPERIMENTAL: enabled
     if: github.ref == 'refs/heads/master'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set env variables
         run: |
           echo "REPOSITORY=ghcr.io/${REPOSITORY:-$GITHUB_REPOSITORY}-api" >> $GITHUB_ENV
