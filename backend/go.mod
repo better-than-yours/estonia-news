@@ -11,7 +11,7 @@ require (
 	github.com/lafin/http v0.0.5
 	github.com/lib/pq v1.10.5
 	github.com/mmcdole/gofeed v1.3.0
-	github.com/prometheus/client_golang v1.19.1
+	github.com/prometheus/client_golang v1.20.0
 	github.com/stretchr/testify v1.9.0
 	github.com/thoas/go-funk v0.9.3
 	github.com/uptrace/bun v1.2.1
