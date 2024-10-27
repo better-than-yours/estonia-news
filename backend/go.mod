@@ -14,9 +14,9 @@ require (
 	github.com/prometheus/client_golang v1.20.5
 	github.com/stretchr/testify v1.9.0
 	github.com/thoas/go-funk v0.9.3
-	github.com/uptrace/bun v1.2.3
-	github.com/uptrace/bun/dialect/pgdialect v1.2.3
-	github.com/uptrace/bun/driver/pgdriver v1.2.3
+	github.com/uptrace/bun v1.2.5
+	github.com/uptrace/bun/dialect/pgdialect v1.2.5
+	github.com/uptrace/bun/driver/pgdriver v1.2.5
 	golang.org/x/net v0.30.0
 )
 
@@ -34,7 +34,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
-	github.com/prometheus/common v0.60.0 // indirect
+	github.com/prometheus/common v0.60.1 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/puzpuzpuz/xsync/v3 v3.4.0 // indirect
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
