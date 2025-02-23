@@ -1,8 +1,8 @@
 module estonia-news
 
-go 1.23
+go 1.23.0
 
-toolchain go1.23.1
+toolchain go1.23.6
 
 require (
 	github.com/go-pkgz/lgr v0.11.1
@@ -11,12 +11,12 @@ require (
 	github.com/lafin/http v0.0.5
 	github.com/lib/pq v1.10.5
 	github.com/mmcdole/gofeed v1.3.0
-	github.com/prometheus/client_golang v1.20.5
+	github.com/prometheus/client_golang v1.21.0
 	github.com/stretchr/testify v1.10.0
 	github.com/thoas/go-funk v0.9.3
-	github.com/uptrace/bun v1.2.9
-	github.com/uptrace/bun/dialect/pgdialect v1.2.9
-	github.com/uptrace/bun/driver/pgdriver v1.2.9
+	github.com/uptrace/bun v1.2.10
+	github.com/uptrace/bun/dialect/pgdialect v1.2.10
+	github.com/uptrace/bun/driver/pgdriver v1.2.10
 	golang.org/x/net v0.35.0
 )
 
@@ -42,7 +42,7 @@ require (
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/otel v1.34.0 // indirect
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
+	golang.org/x/crypto v0.34.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
