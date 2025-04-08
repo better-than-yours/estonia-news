@@ -2,10 +2,10 @@ name: actions
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -68,7 +68,7 @@ jobs:
       - name: Build image
         run: docker build --build-arg VERSION=$GITHUB_REF:$GITHUB_SHA --build-arg GOARCH=${{ matrix.goarch }} --build-arg GOARM=${{ matrix.goarm }} -t $REPOSITORY:${{ matrix.arch }} -f Dockerfile.backend .
       - name: Publish image
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         run: |
           echo ${{ secrets.DOCKER_TOKEN }} | docker login ghcr.io -u $DOCKER_USER --password-stdin
           docker push $REPOSITORY:${{ matrix.arch }}
@@ -77,7 +77,7 @@ jobs:
     needs: [lint, build]
     env:
       DOCKER_CLI_EXPERIMENTAL: enabled
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
       - name: Set env variables
