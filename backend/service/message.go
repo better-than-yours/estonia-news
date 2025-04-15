@@ -175,7 +175,7 @@ func Delete(ctx context.Context, entry entity.Entry) error {
 	msg := deleteMessageObject(ctx, entry.MessageID)
 	_, err := bot.Request(msg)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to delete Telegram message for entry '%s': %v", entry.ID, err)
 	}
 	return nil
 }

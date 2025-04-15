@@ -6,6 +6,7 @@ import (
 	"errors"
 	"estonia-news/config"
 	"estonia-news/entity"
+	"fmt"
 
 	"github.com/mmcdole/gofeed"
 	"github.com/thoas/go-funk"
@@ -32,10 +33,10 @@ func AddMissedCategories(ctx context.Context, items []*gofeed.Item) (map[string]
 				}
 				_, err = dbConnect.NewInsert().Model(&category).On("CONFLICT (name, provider_id) DO NOTHING").Exec(ctx)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to add category '%s' for provider '%d': %v", categoryName, provider.ID, err)
 				}
 			} else {
-				return nil, err
+				return nil, fmt.Errorf("failed to add category '%s' for provider '%d': %v", categoryName, provider.ID, err)
 			}
 		}
 		categoriesMap[categoryName] = category.ID

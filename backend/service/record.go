@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"estonia-news/config"
@@ -18,7 +19,7 @@ func DeleteRecord(ctx context.Context, entry entity.Entry) error {
 	dbConnect := ctx.Value(config.CtxDBKey).(*bun.DB)
 	_, err := dbConnect.NewDelete().Model(&entry).WherePK().Exec(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to delete record '%s': %v", entry.ID, err)
 	}
 	return nil
 }
@@ -45,11 +46,11 @@ func UpsertRecord(ctx context.Context, item *config.FeedItem, messageID int) err
 	}
 	_, err = dbConnect.NewInsert().Model(&entry).On("CONFLICT (id) DO UPDATE").Exec(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to add/update record '%s': %v", entry.ID, err)
 	}
 	_, err = dbConnect.NewDelete().Model(&entity.EntryToCategory{}).Where("entry_id = ?", item.GUID).Exec(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to add/update record '%s': %v", entry.ID, err)
 	}
 	for _, categoryName := range item.Categories {
 		var category entity.Category
@@ -62,10 +63,10 @@ func UpsertRecord(ctx context.Context, item *config.FeedItem, messageID int) err
 				}
 				_, err = dbConnect.NewInsert().Model(&category).On("CONFLICT (name, provider_id) DO NOTHING").Exec(ctx)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to add/update categories for record '%s': %v", entry.ID, err)
 				}
 			} else {
-				return err
+				return fmt.Errorf("failed to add/update categories for record '%s': %v", entry.ID, err)
 			}
 		}
 		_, err = dbConnect.NewInsert().Model(&entity.EntryToCategory{
@@ -73,7 +74,7 @@ func UpsertRecord(ctx context.Context, item *config.FeedItem, messageID int) err
 			CategoryID: category.ID,
 		}).On("CONFLICT (entry_id, category_id) DO NOTHING").Exec(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to add/update categories for record '%s': %v", entry.ID, err)
 		}
 	}
 	return nil

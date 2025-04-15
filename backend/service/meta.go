@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/lafin/http"
@@ -42,7 +43,7 @@ func GetMeta(link string) (*Meta, error) {
 	var meta Meta
 	body, _, err := http.Get(link, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch meta for link '%s': %v", link, err)
 	}
 	doc, _ := html.Parse(bytes.NewReader(body))
 	meta.ImageURL = findMeta(doc, "og:image")

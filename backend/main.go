@@ -28,7 +28,7 @@ import (
 )
 
 func hasChanges(item *config.FeedItem, entry entity.Entry) bool {
-	return !(entry.Title == item.Title && entry.Description == item.Description && entry.Link == item.Link && entry.ImageURL == item.ImageURL && entry.Paywall == item.Paywall)
+	return entry.Title != item.Title || entry.Description != item.Description || entry.Link != item.Link || entry.ImageURL != item.ImageURL || entry.Paywall != item.Paywall
 }
 
 func checkRecord(ctx context.Context, item *config.FeedItem) error {
@@ -57,19 +57,19 @@ func editMessage(ctx context.Context, item *config.FeedItem, entry entity.Entry)
 		if strings.Contains(err.Error(), "message to edit not found") {
 			if err = service.DeleteRecord(ctx, entry); err != nil {
 				misc.Error("delete_record", fmt.Sprintf("delete record '%s'", entry.ID), err)
-				return err
+				return fmt.Errorf("failed to edit message for record '%s': %v", entry.ID, err)
 			}
 			time.Sleep(config.TimeoutBetweenMessages)
 		}
-		return err
+		return fmt.Errorf("failed to edit message for record '%s': %v", entry.ID, err)
 	}
 	_, err = sendMessage(ctx, msg)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to edit message for record '%s': %v", entry.ID, err)
 	}
 	err = service.UpsertRecord(ctx, item, entry.MessageID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to edit message for record '%s': %v", entry.ID, err)
 	}
 	return nil
 }
@@ -78,20 +78,20 @@ func newMessage(ctx context.Context, item *config.FeedItem) error {
 	misc.Info(fmt.Sprintf("send message '%s'", item.GUID))
 	msg, err := service.Add(ctx, item)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to add message for record '%s': %v", item.GUID, err)
 	}
 	sendedMsg, err := sendMessage(ctx, msg)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to add message for record '%s': %v", item.GUID, err)
 	}
 	if sendedMsg.MessageID == 0 {
 		err = errors.New("empty MessageID")
 		misc.Error("add_record", fmt.Sprintf("add record '%s'", item.GUID), err)
-		return err
+		return fmt.Errorf("failed to add message for record '%s': %v", item.GUID, err)
 	}
 	err = service.UpsertRecord(ctx, item, sendedMsg.MessageID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to add message for record '%s': %v", item.GUID, err)
 	}
 	return nil
 }
@@ -106,7 +106,7 @@ func sendMessage(ctx context.Context, msg tgbotapi.Chattable) (*tgbotapi.Message
 			misc.Error("send_message", "send message", err)
 			return &sendedMsg, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("failed to send Telegram message: %v", err)
 	}
 	return &sendedMsg, nil
 }
@@ -138,12 +138,12 @@ func deleteDeletedEntries(ctx context.Context, items []*config.FeedItem) error {
 			if err := service.Delete(ctx, entry); err != nil {
 				misc.Error("delete_message", fmt.Sprintf("delete message '%s'", entry.ID), err)
 				if !strings.Contains(err.Error(), "message to delete not found") {
-					return err
+					return fmt.Errorf("failed to delete message for record '%s': %v", entry.ID, err)
 				}
 			}
 			if err := service.DeleteRecord(ctx, entry); err != nil {
 				misc.Error("delete_record", fmt.Sprintf("delete record '%s'", entry.ID), err)
-				return err
+				return fmt.Errorf("failed to delete message for record '%s': %v", entry.ID, err)
 			}
 			time.Sleep(config.TimeoutBetweenMessages)
 		}
@@ -177,7 +177,7 @@ func findSimilarRecord(ctx context.Context, item *config.FeedItem) (bool, error)
 	var entry entity.Entry
 	exists, err := dbConnect.NewSelect().Model(&entry).Where("updated_at > NOW() - INTERVAL '1 day' AND provider_id != ? AND similarity(?,title) > 0.3", provider.ID, item.Title).Exists(ctx)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to check for similar record: %v", err)
 	}
 	return exists, nil
 }

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/lafin/http"
@@ -11,12 +12,12 @@ import (
 func GetFeed(feedURL string) (*gofeed.Feed, error) {
 	body, _, err := http.Get(feedURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get feed from URL '%s': %v", feedURL, err)
 	}
 	fp := gofeed.NewParser()
 	feed, err := fp.ParseString(string(body))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get feed from URL '%s': %v", feedURL, err)
 	}
 	return feed, nil
 }
@@ -24,7 +25,7 @@ func GetFeed(feedURL string) (*gofeed.Feed, error) {
 func getImage(imageURL string) ([]byte, error) {
 	body, _, err := http.Get(imageURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get image from URL '%s': %v", imageURL, err)
 	}
 	return body, nil
 }

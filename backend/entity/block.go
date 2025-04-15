@@ -14,7 +14,7 @@ func GetEntryByID(ctx context.Context, entryID string) (*Entry, error) {
 	var entry Entry
 	err := dbConnect.NewSelect().Model(&entry).Relation("Categories.Category").Where("id LIKE ?", fmt.Sprintf("%s%s%s", "%", entryID, "%")).Scan(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get entry '%s': %v", entryID, err)
 	}
 	return &entry, nil
 }
@@ -26,7 +26,7 @@ func AddCategoryToBlock(ctx context.Context, categoryID int) error {
 		CategoryID: categoryID,
 	}).Ignore().Exec(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to add category %d to block: %v", categoryID, err)
 	}
 	return nil
 }
@@ -36,7 +36,7 @@ func DeleteCategoryFromBlock(ctx context.Context, categoryID int) error {
 	dbConnect := ctx.Value(config.CtxDBKey).(*bun.DB)
 	_, err := dbConnect.NewDelete().Model(&BlockedCategory{}).Where("category_id = ?", categoryID).Exec(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to delete category %d from block: %v", categoryID, err)
 	}
 	return nil
 }
@@ -47,7 +47,7 @@ func GetListBlocks(ctx context.Context) ([]BlockedCategory, error) {
 	var blocks []BlockedCategory
 	err := dbConnect.NewSelect().Model(&blocks).Relation("Category.Provider").Scan(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get list of blocks: %v", err)
 	}
 	return blocks, nil
 }
